@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Sign In | POS SaaS{% endblock %}
+{% block content %}
+<section class="grid min-h-[calc(100vh-8rem)] items-stretch gap-4 lg:grid-cols-[1fr_28rem]">
+  <div class="page-section surface-strong flex flex-col justify-between overflow-hidden">
+    <div class="max-w-2xl">
+      <div class="flex flex-wrap gap-2">
+        <span class="chip">Secure access</span>
+        <span class="chip">Tenant-scoped</span>
+      </div>
+      <h1 class="page-title mt-4 text-3xl font-bold sm:text-5xl">Sign in to the operations console.</h1>
+      <p class="mt-4 max-w-xl text-sm leading-6 app-note sm:text-base">
+        Your account opens only the workspaces and tools assigned to your role. Tenant context is selected server-side and carried through the session.
+      </p>
+      <div class="mt-7 grid gap-3 sm:grid-cols-3">
+        <div class="stat-tile">
+          <div class="stat-label">Boundary</div>
+          <div class="stat-value text-2xl">Tenant</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Access</div>
+          <div class="stat-value text-2xl">RBAC</div>
+        </div>
+        <div class="stat-tile">
+          <div class="stat-label">Session</div>
+          <div class="stat-value text-2xl">POST</div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-8 grid gap-3 text-sm app-note">
+      <div class="card-soft rounded-2xl p-4">
+        <div class="font-semibold text-[color:var(--text)]">Protected by Django sessions and CSRF</div>
+        <div class="mt-1">Login rotates the session key; logout is a POST-only action with CSRF protection.</div>
+      </div>
+      <div class="card-soft rounded-2xl p-4">
+        <div class="font-semibold text-[color:var(--text)]">Workspace selection is explicit</div>
+        <div class="mt-1">Users with multiple tenants choose the active workspace before tenant-scoped data is shown.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-section surface flex items-center">
+    <div class="w-full">
+      <span class="chip">Sign in</span>
+      <h2 class="page-title mt-4 text-3xl font-bold">Welcome back</h2>
+      <p class="mt-2 text-sm leading-6 app-note">Use your staff account to continue.</p>
+      <form method="post" class="mt-8 space-y-5">
+        {% csrf_token %}
+        {% if next %}
+          <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+        {% if form.non_field_errors %}
+          <div class="message-error">
+            {% for error in form.non_field_errors %}
+              <div>{{ error }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="space-y-2">
+          <label class="text-sm font-semibold" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+          {{ form.username }}
+          {% if form.username.errors %}
+            <div class="field-help text-[color:var(--danger)]">{{ form.username.errors|striptags }}</div>
+          {% endif %}
+        </div>
+        <div class="space-y-2">
+          <label class="text-sm font-semibold" for="{{ form.password.id_for_label }}">Password</label>
+          {{ form.password }}
+          {% if form.password.errors %}
+            <div class="field-help text-[color:var(--danger)]">{{ form.password.errors|striptags }}</div>
+          {% endif %}
+        </div>
+        <button class="button-primary w-full" type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

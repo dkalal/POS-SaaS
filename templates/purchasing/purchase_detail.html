@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Purchase {{ purchase.purchase_number }} | POS SaaS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <header class="glass rounded-3xl px-6 py-5 shadow-glow">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <div class="text-sm uppercase tracking-[0.22em] text-sky-200/80">Procurement</div>
+        <h1 class="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">{{ purchase.purchase_number }}</h1>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{{ purchase.supplier.name }} · Ordered {{ purchase.order_date }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'purchasing:purchase-list' %}">Back to purchases</a>
+        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'dashboard' %}">Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  {% if messages %}
+    <div class="space-y-3">
+      {% for message in messages %}
+        <div class="glass rounded-2xl px-4 py-3 text-sm {% if message.tags == 'error' %}border-rose-500/30 text-rose-200{% else %}border-emerald-500/25 text-emerald-100{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <section class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+    <div class="glass rounded-3xl p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="font-display text-2xl font-semibold">Purchase lines</h2>
+          <p class="mt-2 text-sm text-slate-300">These items will create stock movements only when the purchase is received.</p>
+        </div>
+        <span class="chip {% if purchase.status == 'draft' %}bg-sky-500/10 text-sky-100{% elif purchase.status == 'received' %}bg-emerald-500/10 text-emerald-100{% else %}bg-slate-800/80 text-slate-300{% endif %}">{{ purchase.get_status_display }}</span>
+      </div>
+
+      <div class="mt-6 overflow-hidden rounded-2xl border border-slate-800">
+        <table class="min-w-full divide-y divide-slate-800 text-sm">
+          <thead class="bg-slate-950/60 text-slate-400">
+            <tr>
+              <th class="px-4 py-3 text-left font-medium">Product</th>
+              <th class="px-4 py-3 text-left font-medium">Quantity</th>
+              <th class="px-4 py-3 text-left font-medium">Unit cost</th>
+              <th class="px-4 py-3 text-left font-medium">Line total</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800 bg-slate-950/40">
+            {% for item in items %}
+              <tr>
+                <td class="px-4 py-3 text-slate-100">{{ item.product.name }}</td>
+                <td class="px-4 py-3 text-slate-100">{{ item.quantity }}</td>
+                <td class="px-4 py-3 text-slate-100">{{ item.unit_cost }}</td>
+                <td class="px-4 py-3 text-slate-100">{{ item.line_total }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="4" class="px-4 py-8 text-center text-slate-400">No line items found.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <aside class="space-y-6">
+      <div class="glass rounded-3xl p-6">
+        <h2 class="font-display text-2xl font-semibold">Summary</h2>
+        <div class="mt-4 space-y-3 text-sm text-slate-300">
+          <div class="flex items-center justify-between gap-3"><span>Supplier</span><span class="text-slate-100">{{ purchase.supplier.name }}</span></div>
+          <div class="flex items-center justify-between gap-3"><span>Order date</span><span class="text-slate-100">{{ purchase.order_date }}</span></div>
+          <div class="flex items-center justify-between gap-3"><span>Expected date</span><span class="text-slate-100">{{ purchase.expected_date|default:"-" }}</span></div>
+          <div class="flex items-center justify-between gap-3"><span>Total</span><span class="text-slate-100">{{ total_amount }}</span></div>
+          <div class="flex items-center justify-between gap-3"><span>Created by</span><span class="text-slate-100">{{ purchase.created_by }}</span></div>
+          <div class="flex items-center justify-between gap-3"><span>Received</span><span class="text-slate-100">{{ purchase.received_date|default:"-" }}</span></div>
+          <div class="flex items-center justify-between gap-3"><span>Cancelled</span><span class="text-slate-100">{{ purchase.cancelled_date|default:"-" }}</span></div>
+        </div>
+      </div>
+
+      <div class="glass rounded-3xl p-6">
+        <h2 class="font-display text-2xl font-semibold">Draft actions</h2>
+        <p class="mt-2 text-sm text-slate-300">You can duplicate this purchase into a fresh draft or edit it while it remains in draft state.</p>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a class="button-secondary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'purchasing:purchase-duplicate' purchase.id %}">Duplicate</a>
+          {% if purchase.status == 'draft' %}
+            <a class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'purchasing:purchase-edit' purchase.id %}">Edit draft</a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if purchase.status == 'draft' %}
+        <div class="glass rounded-3xl p-6">
+          <h2 class="font-display text-2xl font-semibold">Receive purchase</h2>
+          <p class="mt-2 text-sm text-slate-300">Posting receipt will increment stock and create append-only movement rows.</p>
+          <form class="mt-6" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="receive">
+            <button class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">Mark as received</button>
+          </form>
+        </div>
+      {% elif purchase.status == 'received' %}
+        <div class="glass rounded-3xl p-6">
+          <h2 class="font-display text-2xl font-semibold">Cancel received purchase</h2>
+          <p class="mt-2 text-sm text-slate-300">This creates compensating stock movements and preserves the audit trail.</p>
+          <form class="mt-6 space-y-4" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="cancel">
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-slate-200" for="cancel_reason">Reason</label>
+              <textarea id="cancel_reason" name="cancel_reason" rows="4" class="w-full rounded-2xl border border-slate-700 bg-slate-950/80 px-4 py-3 text-slate-100 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20"></textarea>
+            </div>
+            <button class="rounded-2xl bg-rose-500/15 px-5 py-3 text-sm font-semibold text-rose-100 hover:bg-rose-500/20" type="submit">Cancel purchase</button>
+          </form>
+          {% if purchase.cancelled_reason %}
+            <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
+              <div class="font-semibold text-white">Saved reason</div>
+              <div class="mt-2">{{ purchase.cancelled_reason }}</div>
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="glass rounded-3xl p-6">
+          <h2 class="font-display text-2xl font-semibold">Cancelled</h2>
+          <p class="mt-2 text-sm text-slate-300">This purchase was cancelled and is preserved for audit history.</p>
+          {% if purchase.cancelled_reason %}
+            <div class="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">{{ purchase.cancelled_reason }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </aside>
+  </section>
+</div>
+{% endblock %}

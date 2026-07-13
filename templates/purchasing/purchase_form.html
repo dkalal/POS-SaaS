@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <header class="glass rounded-3xl px-6 py-5 shadow-glow">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <div class="text-sm uppercase tracking-[0.22em] text-sky-200/80">Procurement</div>
+        <h1 class="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">{{ page_heading }}</h1>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{{ page_description }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'purchasing:purchase-list' %}">Back to purchases</a>
+        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'dashboard' %}">Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
+    <form class="contents" method="post">
+      {% csrf_token %}
+      <div class="glass rounded-3xl p-6">
+        <h2 class="font-display text-2xl font-semibold">Purchase details</h2>
+        <p class="mt-2 text-sm text-slate-300">This header stays in draft until the receiving service posts stock movements.</p>
+        <div class="mt-6 space-y-4">
+          {% for field in purchase_form %}
+            <div class="space-y-2">
+              <label class="block text-sm font-medium text-slate-200" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<p class="text-xs text-slate-400">{{ field.help_text }}</p>{% endif %}
+              {% for error in field.errors %}
+                <p class="text-xs text-rose-200">{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endfor %}
+          {% for error in purchase_form.non_field_errors %}
+            <p class="text-xs text-rose-200">{{ error }}</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="glass rounded-3xl p-6">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <h2 class="font-display text-2xl font-semibold">Line items</h2>
+            <p class="mt-2 text-sm text-slate-300">Add the products, quantities, and unit costs for this supplier order.</p>
+          </div>
+          <span class="chip">{{ item_formset.total_form_count }} rows</span>
+        </div>
+
+        {{ item_formset.management_form }}
+        {% for error in item_formset.non_form_errors %}
+          <p class="mt-4 text-xs text-rose-200">{{ error }}</p>
+        {% endfor %}
+        <div class="mt-6 space-y-4">
+          {% for form in item_formset.forms %}
+            <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+              <div class="grid gap-4 lg:grid-cols-3">
+                <div class="space-y-2 lg:col-span-1">
+                  <label class="block text-sm font-medium text-slate-200" for="{{ form.product.id_for_label }}">Product</label>
+                  {{ form.product }}
+                  {% for error in form.product.errors %}<p class="text-xs text-rose-200">{{ error }}</p>{% endfor %}
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-sm font-medium text-slate-200" for="{{ form.quantity.id_for_label }}">Quantity</label>
+                  {{ form.quantity }}
+                  {% for error in form.quantity.errors %}<p class="text-xs text-rose-200">{{ error }}</p>{% endfor %}
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-sm font-medium text-slate-200" for="{{ form.unit_cost.id_for_label }}">Unit cost</label>
+                  {{ form.unit_cost }}
+                  {% for error in form.unit_cost.errors %}<p class="text-xs text-rose-200">{{ error }}</p>{% endfor %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <div class="mt-6 flex flex-wrap gap-3">
+          <button class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">{{ submit_label }}</button>
+          <a class="button-secondary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'purchasing:purchase-list' %}">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

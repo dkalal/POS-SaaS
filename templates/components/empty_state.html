@@ -1,0 +1,9 @@
+<div class="empty-state">
+  <div>
+    <strong>{{ title }}</strong>
+    <p>{{ message }}</p>
+  </div>
+  {% if action_url and action_label %}
+    <a class="button-secondary" href="{{ action_url }}">{{ action_label }}</a>
+  {% endif %}
+</div>

@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | POS SaaS{% endblock %}
+{% block content %}
+<div class="stack">
+  {% if not has_tenant %}
+    <section class="page-section">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 class="text-xl font-extrabold">Select a workspace</h2>
+          <p class="mt-1 text-sm app-note">Choose the tenant context before opening back-office tools.</p>
+        </div>
+        <span class="chip">Tenant scoped</span>
+      </div>
+      <div class="mt-4 grid gap-3">
+        {% for tenant in available_tenants %}
+          <form class="card-soft flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" method="post" action="{% url 'select_tenant' tenant.id %}">
+            {% csrf_token %}
+            <div>
+              <div class="font-bold">{{ tenant.name }}</div>
+              <div class="text-sm app-note">{{ tenant.slug }}</div>
+            </div>
+            <button class="button-primary" type="submit">Open workspace</button>
+          </form>
+        {% empty %}
+          {% include "components/empty_state.html" with title="No active workspaces" message="This account is not assigned to an active tenant yet." %}
+        {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    <section class="page-section">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="chip">Dashboard</span>
+            <span class="chip">{{ current_tenant.name }}</span>
+          </div>
+          <h2 class="mt-3 text-2xl font-extrabold tracking-0 md:text-3xl">Dashboard</h2>
+          <p class="mt-1 max-w-3xl text-sm app-note">
+            Operational snapshot for {{ selected_period_label|lower }} using completed sales, inventory, and purchase data for the current tenant.
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {% if can_open_register %}
+            <a class="button-primary" href="{% url 'sales:register' %}">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v9H4V5Zm2 11h12v3H6v-3Z"/></svg>
+              Open register
+            </a>
+          {% endif %}
+          {% if can_manage_catalog %}
+            <a class="button-secondary" href="{% url 'catalog:product-list' %}">New product</a>
+          {% endif %}
+          {% if can_manage_purchases %}
+            <a class="button-secondary" href="{% url 'purchasing:purchase-create' %}">New purchase</a>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    <form class="page-section" method="get">
+      <div class="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)] md:items-end">
+        <div>
+          <label class="text-xs font-extrabold uppercase tracking-[0.08em] app-note" for="period">Date range</label>
+          <select class="mt-1" id="period" name="period">
+            {% for option in date_range_options %}
+              <option value="{{ option.value }}" {% if option.value == selected_period %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button class="button-primary" type="submit">Apply</button>
+          <span class="text-sm app-note">{{ period_start|date:"M j, Y" }} - {{ period_end|date:"M j, Y" }}</span>
+        </div>
+      </div>
+    </form>
+
+    {% url 'sales:register' as register_url %}
+    {% url 'catalog:product-list' as product_url %}
+    {% url 'inventory:adjustment-list' as inventory_url %}
+    {% url 'purchasing:purchase-list' as purchase_url %}
+    <section class="stat-grid">
+      {% include "components/stat_card.html" with icon="sales" label="Total sales" value=stats.sales_total hint=selected_period_label href=register_url %}
+      {% include "components/stat_card.html" with icon="orders" label="Sales count" value=stats.sale_count hint="Completed orders" href=register_url %}
+      {% include "components/stat_card.html" with icon="sales" label="Avg. order" value=stats.average_order_value hint="Completed sales only" href=register_url %}
+      {% include "components/stat_card.html" with icon="items" label="Items sold" value=stats.items_sold hint="Sale item quantity" href=product_url %}
+      {% include "components/stat_card.html" with icon="stock" label="Low stock" value=stats.low_stock_count hint="At or below reorder" href=inventory_url %}
+    </section>
+
+    <section class="content-grid split">
+      <div class="stack">
+        <section class="page-section">
+          <div class="table-toolbar">
+            <div>
+              <h2>Sales performance</h2>
+              <p>Completed sales grouped by day for the selected range.</p>
+            </div>
+          </div>
+          {% if sales_by_day %}
+            <div class="grid gap-2">
+              {% for row in sales_by_day %}
+                <div class="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)_120px] md:items-center">
+                  <div class="text-sm font-bold">{{ row.day|date:"M j" }}</div>
+                  <div class="h-3 rounded-full bg-slate-200 dark:bg-slate-800">
+                    <div class="h-3 rounded-full bg-blue-600" style="width: {{ row.bar_percent }}%; min-width: 0.35rem;"></div>
+                  </div>
+                  <div class="text-sm font-bold md:text-right">{{ row.total }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            {% include "components/empty_state.html" with title="No completed sales" message="Complete sales in the register to populate this performance view." action_url=register_url action_label="Open register" %}
+          {% endif %}
+        </section>
+
+        <section class="page-section">
+          {% include "components/table_toolbar.html" with title="Low-stock products" subtitle="Products at or below their reorder level." action_url=inventory_url action_label="Open stock" %}
+          <div class="responsive-table-wrap">
+            <table>
+              <thead class="tabular-head">
+                <tr>
+                  <th class="text-left">Product</th>
+                  <th class="text-left">SKU</th>
+                  <th class="text-left">Current</th>
+                  <th class="text-left">Reorder</th>
+                  <th class="text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody class="tabular-body">
+                {% for product in low_stock_products %}
+                  <tr>
+                    <td class="font-bold">{{ product.name }}</td>
+                    <td>{{ product.sku }}</td>
+                    <td>{{ product.stock_quantity }}</td>
+                    <td>{{ product.reorder_level }}</td>
+                    <td>
+                      {% if product.status == "critical" %}
+                        <span class="status-pill status-danger">Critical</span>
+                      {% else %}
+                        <span class="status-pill status-warning">Low</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="5">
+                      {% include "components/empty_state.html" with title="Stock is healthy" message="No products are currently at or below reorder level." action_url=product_url action_label="Review products" %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="page-section">
+          {% include "components/table_toolbar.html" with title="Recent sales" subtitle="Latest completed sales for this tenant." %}
+          <div class="responsive-table-wrap">
+            <table>
+              <thead class="tabular-head">
+                <tr>
+                  <th class="text-left">Receipt</th>
+                  <th class="text-left">Date</th>
+                  <th class="text-left">Cashier</th>
+                  <th class="text-left">Total</th>
+                  <th class="text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody class="tabular-body">
+                {% for sale in recent_sales %}
+                  <tr>
+                    <td class="font-bold">{{ sale.receipt_number|default:sale.sale_number }}</td>
+                    <td>{{ sale.created_at|date:"M j, Y H:i" }}</td>
+                    <td>{{ sale.cashier }}</td>
+                    <td>{{ sale.grand_total }}</td>
+                    <td><span class="status-pill status-success">{{ sale.status }}</span></td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="5">
+                      {% include "components/empty_state.html" with title="No sales yet" message="Completed sales will appear here as receipts are created." action_url=register_url action_label="Open register" %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <aside class="stack">
+        <section class="page-section">
+          <div class="table-toolbar">
+            <div>
+              <h2>Operating totals</h2>
+              <p>Real tenant-scoped counts from back-office records.</p>
+            </div>
+          </div>
+          <div class="grid gap-2">
+            <div class="card-soft flex items-center justify-between gap-3 p-3">
+              <span class="app-note">Products</span>
+              <strong>{{ stats.products }}</strong>
+            </div>
+            <div class="card-soft flex items-center justify-between gap-3 p-3">
+              <span class="app-note">Categories</span>
+              <strong>{{ stats.categories }}</strong>
+            </div>
+            <div class="card-soft flex items-center justify-between gap-3 p-3">
+              <span class="app-note">Suppliers</span>
+              <strong>{{ stats.suppliers }}</strong>
+            </div>
+            <div class="card-soft flex items-center justify-between gap-3 p-3">
+              <span class="app-note">Stock value</span>
+              <strong>{{ stats.stock_value }}</strong>
+            </div>
+            <div class="card-soft flex items-center justify-between gap-3 p-3">
+              <span class="app-note">Purchase spend</span>
+              <strong>{{ stats.purchase_spend }}</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="page-section">
+          <div class="table-toolbar">
+            <div>
+              <h2>Quick actions</h2>
+              <p>Only actions available to your role are shown.</p>
+            </div>
+          </div>
+          <div class="grid gap-2">
+            {% if can_open_register %}
+              <a class="button-secondary justify-start" href="{% url 'sales:register' %}">Open register</a>
+            {% endif %}
+            {% if can_manage_catalog %}
+              <a class="button-secondary justify-start" href="{% url 'catalog:product-list' %}">Manage products</a>
+              <a class="button-secondary justify-start" href="{% url 'suppliers:supplier-list' %}">Manage suppliers</a>
+            {% endif %}
+            {% if can_manage_purchases %}
+              <a class="button-secondary justify-start" href="{% url 'purchasing:purchase-create' %}">Record purchase</a>
+            {% endif %}
+            {% if can_manage_inventory %}
+              <a class="button-secondary justify-start" href="{% url 'inventory:adjustment-create' %}">New stock adjustment</a>
+            {% endif %}
+            {% if can_manage_members %}
+              <a class="button-secondary justify-start" href="{% url 'team-members' %}">Manage team</a>
+            {% endif %}
+            {% if can_manage_api_keys %}
+              <a class="button-secondary justify-start" href="{% url 'api-key-management' %}">API keys</a>
+            {% endif %}
+            {% if can_view_reports %}
+              <a class="button-secondary justify-start" href="{% url 'audit:audit-list' %}">Audit reports</a>
+            {% endif %}
+          </div>
+        </section>
+
+        <section class="page-section">
+          <div class="table-toolbar">
+            <div>
+              <h2>Deferred</h2>
+              <p>Not shown as live controls until backend support exists.</p>
+            </div>
+          </div>
+          <div class="grid gap-2 text-sm app-note">
+            <div class="card-soft p-3">Store/location filter: no store model found.</div>
+            <div class="card-soft p-3">Customer widget: no customer module found.</div>
+            <div class="card-soft p-3">Dedicated sales/receipts list: register route exists, list route does not.</div>
+          </div>
+        </section>
+      </aside>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

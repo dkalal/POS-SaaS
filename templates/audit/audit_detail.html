@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Audit Event | POS SaaS{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <header class="glass rounded-3xl px-6 py-5 shadow-glow">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <div class="text-sm uppercase tracking-[0.22em] text-sky-200/80">Compliance</div>
+        <h1 class="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">{{ event.get_action_display }}</h1>
+        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-300">{{ event.target_label }}</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'audit:audit-list' %}">Back to audit log</a>
+        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'dashboard' %}">Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="grid gap-6 lg:grid-cols-2">
+    <div class="glass rounded-3xl p-6">
+      <h2 class="font-display text-2xl font-semibold">Metadata</h2>
+      <div class="mt-4 space-y-3 text-sm text-slate-300">
+        <div class="flex items-center justify-between gap-3"><span>Actor</span><span class="text-slate-100">{{ event.actor }}</span></div>
+        <div class="flex items-center justify-between gap-3"><span>Created</span><span class="text-slate-100">{{ event.created_at }}</span></div>
+        <div class="flex items-center justify-between gap-3"><span>Target</span><span class="text-slate-100">{{ event.target_label }}</span></div>
+        <div class="flex items-center justify-between gap-3"><span>Action</span><span class="text-slate-100">{{ event.get_action_display }}</span></div>
+      </div>
+    </div>
+    <div class="glass rounded-3xl p-6">
+      <h2 class="font-display text-2xl font-semibold">Payloads</h2>
+      <div class="mt-4 space-y-4 text-sm">
+        <div>
+          <div class="text-slate-400">Before</div>
+          <pre class="mt-2 overflow-auto rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-xs text-slate-200">{{ event.before_data }}</pre>
+        </div>
+        <div>
+          <div class="text-slate-400">After</div>
+          <pre class="mt-2 overflow-auto rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-xs text-slate-200">{{ event.after_data }}</pre>
+        </div>
+        <div>
+          <div class="text-slate-400">Metadata</div>
+          <pre class="mt-2 overflow-auto rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-xs text-slate-200">{{ event.metadata }}</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

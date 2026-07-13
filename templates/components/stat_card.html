@@ -1,0 +1,24 @@
+<article class="stat-card">
+  <div class="stat-card-top">
+    <span class="stat-icon">
+      {% if icon == "sales" %}
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16v10H4V7Zm3 3h3m7 0h1M7 14h5"/></svg>
+      {% elif icon == "orders" %}
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18H6V3Zm3 5h6M9 12h6M9 16h4"/></svg>
+      {% elif icon == "items" %}
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 4 8 4 8-4M4 15l8 4 8-4"/></svg>
+      {% elif icon == "stock" %}
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17V7l8-4 8 4v10l-8 4-8-4Zm8-4V3"/></svg>
+      {% else %}
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19V5h14v14H5Zm3-4 3-3 2 2 3-5"/></svg>
+      {% endif %}
+    </span>
+    {% if href %}
+      <a class="stat-link" href="{{ href }}" aria-label="Open {{ label }}">{{ label }}</a>
+    {% else %}
+      <span class="stat-link">{{ label }}</span>
+    {% endif %}
+  </div>
+  <div class="stat-card-value">{{ value }}</div>
+  {% if hint %}<div class="stat-card-hint">{{ hint }}</div>{% endif %}
+</article>

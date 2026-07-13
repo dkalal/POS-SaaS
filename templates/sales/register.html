@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Register | POS SaaS{% endblock %}
+{% block content %}
+<div class="stack">
+  <section class="page-section surface-strong">
+    <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <div class="stack">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="chip">Register</span>
+          <span class="chip">{{ tenant.name }}</span>
+          <span class="badge-pill">{{ cart_count }} item{{ cart_count|pluralize }}</span>
+        </div>
+        <div>
+          <h1 class="page-title text-3xl font-bold sm:text-5xl">Fast checkout, clear cart, no clutter.</h1>
+          <p class="mt-3 max-w-3xl text-sm leading-6 app-note sm:text-base">
+            A single-screen POS flow with product search, instant add-to-cart, discount and tax handling, and a secure service-layer checkout.
+          </p>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a class="button-secondary" href="{% url 'dashboard' %}">Dashboard</a>
+        <button class="button-primary" type="button" data-open-modal="pricing-modal">Discount & tax</button>
+        <button class="button-secondary" type="button" data-open-modal="checkout-modal">Checkout</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="content-grid split">
+    <div class="page-section surface">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 class="page-title text-2xl font-semibold">Catalog</h2>
+          <p class="mt-2 text-sm app-note">Search the live tenant catalog and add items in one click.</p>
+        </div>
+        <form method="get" class="w-full max-w-xl">
+          {{ search_form.q }}
+        </form>
+      </div>
+
+      <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {% for item in products %}
+          <article class="surface-strong overflow-hidden rounded-[1.4rem]">
+            <div class="h-28" style="background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 20%, transparent), color-mix(in srgb, var(--primary-strong) 18%, transparent));"></div>
+            <div class="p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-xs uppercase tracking-[0.16em] app-note">{{ item.category_name }}</div>
+                  <h3 class="mt-1 text-lg font-semibold">{{ item.product.name }}</h3>
+                </div>
+                <span class="chip">{{ item.stock_quantity }} stock</span>
+              </div>
+              <div class="mt-3 flex items-end justify-between gap-3">
+                <div>
+                  <div class="text-xs app-note">SKU {{ item.product.sku }}</div>
+                  <div class="mt-1 text-2xl font-bold">{{ item.product.sale_price }}</div>
+                </div>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="add">
+                  <input type="hidden" name="product_id" value="{{ item.product.id }}">
+                  <button class="button-primary" type="submit">Add</button>
+                </form>
+              </div>
+            </div>
+          </article>
+        {% empty %}
+          <div class="empty-state sm:col-span-2 xl:col-span-3">No products found for the current search.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <aside class="stack">
+      <section class="page-section surface">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h2 class="page-title text-2xl font-semibold">Cart</h2>
+            <p class="mt-2 text-sm app-note">Adjust quantities, review totals, then hand off to payment.</p>
+          </div>
+          <span class="chip">{{ cart_lines|length }} line{{ cart_lines|length|pluralize }}</span>
+        </div>
+
+        <div class="mt-4 space-y-3">
+          {% for line in cart_lines %}
+            <div class="surface-strong rounded-2xl p-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="font-semibold">{{ line.product.name }}</div>
+                  <div class="text-sm app-note">{{ line.product.sku }} · {{ line.unit_price }} each</div>
+                </div>
+                <form method="post">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="remove-line">
+                  <input type="hidden" name="product_id" value="{{ line.product.id }}">
+                  <button class="button-danger px-3 py-2 text-xs" type="submit">Remove</button>
+                </form>
+              </div>
+              <div class="mt-4 flex items-center gap-3">
+                <form method="post" class="flex items-center gap-3">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="update-line">
+                  <input type="hidden" name="product_id" value="{{ line.product.id }}">
+                  <div class="w-24">
+                    <input class="app-field" type="number" name="quantity" min="1" value="{{ line.quantity }}">
+                  </div>
+                  <button class="button-secondary px-4 py-3 text-xs" type="submit">Update</button>
+                </form>
+                <div class="ml-auto text-lg font-bold">{{ line.line_total }}</div>
+              </div>
+            </div>
+          {% empty %}
+            <div class="empty-state">Your cart is empty. Add items from the catalog to begin.</div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="page-section surface">
+        <h3 class="page-title text-xl font-semibold">Totals</h3>
+        <div class="mt-4 space-y-3 text-sm">
+          <div class="flex items-center justify-between"><span class="app-note">Subtotal</span><span class="font-semibold">{{ totals.subtotal }}</span></div>
+          <div class="flex items-center justify-between"><span class="app-note">Discount</span><span class="font-semibold">-{{ totals.discount }}</span></div>
+          <div class="flex items-center justify-between"><span class="app-note">Tax</span><span class="font-semibold">{{ totals.tax }}</span></div>
+          <div class="flex items-center justify-between border-t border-dashed border-slate-700 pt-3 text-lg"><span class="font-semibold">Total</span><span class="font-bold">{{ totals.grand_total }}</span></div>
+        </div>
+        <div class="mt-5 grid gap-3">
+          <button class="button-secondary" type="button" data-open-modal="pricing-modal">Apply fee or discount</button>
+          <form method="post" class="grid gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear-cart">
+            <button class="button-secondary" type="submit">Empty cart</button>
+          </form>
+          <button class="button-primary" type="button" data-open-modal="checkout-modal">Pay {{ totals.grand_total }}</button>
+        </div>
+      </section>
+    </aside>
+  </section>
+</div>
+
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 p-4" data-modal="pricing-modal">
+  <div class="w-full max-w-2xl surface-strong rounded-[1.6rem] p-6">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="page-title text-2xl font-semibold">Discount and tax</h2>
+        <p class="mt-2 text-sm app-note">Adjust the order total before checkout.</p>
+      </div>
+      <button class="button-secondary px-3 py-2 text-sm" type="button" data-close-modal>Close</button>
+    </div>
+    <form method="post" class="mt-6 grid gap-4 md:grid-cols-2">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save-pricing">
+      <div class="space-y-2">
+        <label class="text-sm font-semibold" for="{{ pricing_form.discount.id_for_label }}">Discount</label>
+        {{ pricing_form.discount }}
+      </div>
+      <div class="space-y-2">
+        <label class="text-sm font-semibold" for="{{ pricing_form.tax.id_for_label }}">Tax</label>
+        {{ pricing_form.tax }}
+      </div>
+      <div class="md:col-span-2 flex justify-end gap-3">
+        <button class="button-secondary" type="button" data-close-modal>Cancel</button>
+        <button class="button-primary" type="submit">Update total</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/70 p-4" data-modal="checkout-modal">
+  <div class="w-full max-w-2xl surface-strong rounded-[1.6rem] p-6">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="page-title text-2xl font-semibold">Checkout</h2>
+        <p class="mt-2 text-sm app-note">Confirm payment method and finalize the sale atomically in the service layer.</p>
+      </div>
+      <button class="button-secondary px-3 py-2 text-sm" type="button" data-close-modal>Close</button>
+    </div>
+    <form method="post" class="mt-6 grid gap-4 md:grid-cols-2">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="complete-sale">
+      <div class="space-y-2">
+        <label class="text-sm font-semibold" for="{{ checkout_form.payment_method.id_for_label }}">Payment method</label>
+        {{ checkout_form.payment_method }}
+      </div>
+      <div class="space-y-2">
+        <label class="text-sm font-semibold" for="{{ checkout_form.reference.id_for_label }}">Reference</label>
+        {{ checkout_form.reference }}
+      </div>
+      <div class="md:col-span-2 flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+        <div>
+          <div class="text-xs uppercase tracking-[0.16em] app-note">Ready to collect</div>
+          <div class="mt-1 text-xl font-bold">{{ totals.grand_total }}</div>
+        </div>
+        <button class="button-primary" type="submit">Complete sale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    function showModal(id) {
+      var modal = document.querySelector('[data-modal="' + id + '"]');
+      if (modal) {
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      }
+    }
+    function hideModal(modal) {
+      if (modal) {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      }
+    }
+    document.querySelectorAll("[data-open-modal]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        showModal(button.getAttribute("data-open-modal"));
+      });
+    });
+    document.querySelectorAll("[data-modal]").forEach(function (modal) {
+      modal.addEventListener("click", function (event) {
+        if (event.target === modal) {
+          hideModal(modal);
+        }
+      });
+      modal.querySelectorAll("[data-close-modal]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          hideModal(modal);
+        });
+      });
+    });
+  }());
+</script>
+{% endblock %}

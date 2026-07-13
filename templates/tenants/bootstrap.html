@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Bootstrap | POS SaaS{% endblock %}
+{% block content %}
+<div class="stack">
+  {% if created %}
+    <section class="page-section surface-strong">
+      <span class="chip">Bootstrap complete</span>
+      <h1 class="page-title mt-4 text-3xl font-bold sm:text-5xl">Your first tenant is ready.</h1>
+      <p class="mt-3 max-w-3xl text-sm leading-6 app-note sm:text-base">The workspace, owner membership, and first API key were created in one atomic transaction.</p>
+    </section>
+
+    <section class="content-grid split">
+      <div class="page-section surface">
+        <h2 class="page-title text-2xl font-semibold">Copy the API key now</h2>
+        <p class="mt-2 text-sm app-note">This secret is shown only once. Store it safely before continuing.</p>
+        <div class="mt-5 break-all rounded-2xl border border-amber-400/20 bg-amber-400/10 px-4 py-4 font-mono text-sm">{{ raw_key }}</div>
+        <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div class="card-soft rounded-2xl p-4">
+            <div class="text-xs uppercase tracking-[0.2em] app-note">Tenant</div>
+            <div class="mt-2 font-semibold">{{ tenant.name }}</div>
+          </div>
+          <div class="card-soft rounded-2xl p-4">
+            <div class="text-xs uppercase tracking-[0.2em] app-note">Slug</div>
+            <div class="mt-2 font-semibold">{{ tenant.slug }}</div>
+          </div>
+          <div class="card-soft rounded-2xl p-4">
+            <div class="text-xs uppercase tracking-[0.2em] app-note">API key</div>
+            <div class="mt-2 font-semibold">{{ api_key.label }}</div>
+          </div>
+          <div class="card-soft rounded-2xl p-4">
+            <div class="text-xs uppercase tracking-[0.2em] app-note">Cost access</div>
+            <div class="mt-2 font-semibold">{% if api_key.can_view_cost %}Enabled{% else %}Disabled{% endif %}</div>
+          </div>
+        </div>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a class="button-primary" href="{% url 'dashboard' %}">Go to dashboard</a>
+          <a class="button-secondary" href="{% url 'api-key-management' %}">Open API keys</a>
+        </div>
+      </div>
+      <aside class="page-section surface">
+        <h2 class="page-title text-2xl font-semibold">What happens next</h2>
+        <div class="mt-4 space-y-3 text-sm leading-6 app-note">
+          <p>1. The tenant workspace is created.</p>
+          <p>2. You are added as the first owner/admin membership.</p>
+          <p>3. A one-time API key is generated and displayed exactly once.</p>
+        </div>
+        <div class="mt-6 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm">
+          The onboarding flow stays atomic, so there is no partial setup state to clean up if validation fails.
+        </div>
+      </aside>
+    </section>
+  {% else %}
+    <section class="page-section surface-strong">
+      <span class="chip">First-run setup</span>
+      <h1 class="page-title mt-4 text-3xl font-bold sm:text-5xl">Bootstrap the first tenant</h1>
+      <p class="mt-3 max-w-3xl text-sm leading-6 app-note sm:text-base">
+        Create the initial workspace, seat yourself as owner/admin, and mint the first API key in one secure step.
+      </p>
+    </section>
+
+    <section class="content-grid split">
+      <div class="page-section surface">
+        <form method="post" class="space-y-5">
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+            <div class="message-error">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="space-y-2">
+            <label class="text-sm font-semibold" for="{{ form.tenant_name.id_for_label }}">Tenant name</label>
+            {{ form.tenant_name }}
+            {% if form.tenant_name.errors %}<div class="text-sm text-rose-200">{{ form.tenant_name.errors }}</div>{% endif %}
+            <div class="field-help">{{ form.tenant_name.help_text }}</div>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-semibold" for="{{ form.tenant_slug.id_for_label }}">Tenant slug</label>
+            {{ form.tenant_slug }}
+            {% if form.tenant_slug.errors %}<div class="text-sm text-rose-200">{{ form.tenant_slug.errors }}</div>{% endif %}
+            <div class="field-help">{{ form.tenant_slug.help_text }}</div>
+          </div>
+          <div class="space-y-2">
+            <label class="text-sm font-semibold" for="{{ form.api_key_label.id_for_label }}">Initial API key label</label>
+            {{ form.api_key_label }}
+            {% if form.api_key_label.errors %}<div class="text-sm text-rose-200">{{ form.api_key_label.errors }}</div>{% endif %}
+            <div class="field-help">{{ form.api_key_label.help_text }}</div>
+          </div>
+          <label class="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+            {{ form.api_key_can_view_cost }}
+            <div>
+              <div class="text-sm font-semibold">Allow cost price access</div>
+              <div class="field-help">{{ form.api_key_can_view_cost.help_text }}</div>
+            </div>
+          </label>
+          {% if form.api_key_can_view_cost.errors %}<div class="text-sm text-rose-200">{{ form.api_key_can_view_cost.errors }}</div>{% endif %}
+          <button class="button-primary" type="submit">Create tenant and key</button>
+        </form>
+      </div>
+      <aside class="page-section surface">
+        <h2 class="page-title text-2xl font-semibold">What happens next</h2>
+        <div class="mt-4 space-y-3 text-sm leading-6 app-note">
+          <p>1. The tenant workspace is created.</p>
+          <p>2. You are added as the first owner/admin membership.</p>
+          <p>3. A one-time API key is generated and displayed exactly once.</p>
+        </div>
+        <div class="mt-6 rounded-2xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm">
+          The onboarding flow stays atomic, so there is no partial setup state to clean up if validation fails.
+        </div>
+      </aside>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

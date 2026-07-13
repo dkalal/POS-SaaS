@@ -1,0 +1,110 @@
+{% with namespace=request.resolver_match.namespace url_name=request.resolver_match.url_name %}
+<aside class="admin-sidebar" data-sidebar>
+  <div class="sidebar-head">
+    <a class="brand-lockup" href="{% url 'dashboard' %}" aria-label="Open dashboard">
+      <span class="brand-mark">PS</span>
+      <span class="brand-copy">
+        <span class="brand-title">POS SaaS</span>
+        <span class="brand-subtitle">
+          {% if request.tenant %}{{ request.tenant.name }}{% else %}Back office{% endif %}
+        </span>
+      </span>
+    </a>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Back office navigation">
+    <div class="nav-group">
+      <div class="nav-label">Workspace</div>
+      <a class="nav-item {% if url_name == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V3h-8v18ZM3 21h8v-6H3v6Z"/></svg>
+        <span>Dashboard</span>
+      </a>
+      {% if can_open_register %}
+        <a class="nav-item {% if namespace == 'sales' and url_name == 'register' %}is-active{% endif %}" href="{% url 'sales:register' %}">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v9H4V5Zm2 11h12v3H6v-3Zm10-8h2m-12 0h6"/></svg>
+          <span>Register</span>
+        </a>
+      {% endif %}
+      <span class="nav-item is-disabled" aria-disabled="true">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm3 4h8M8 12h8M8 16h5"/></svg>
+        <span>Sales / Receipts</span>
+        <small>Soon</small>
+      </span>
+    </div>
+
+    {% if can_manage_catalog or can_manage_inventory or can_manage_purchases %}
+      <div class="nav-group">
+        <div class="nav-label">Operations</div>
+        {% if can_manage_catalog %}
+          <a class="nav-item {% if namespace == 'catalog' and url_name == 'product-list' %}is-active{% endif %}" href="{% url 'catalog:product-list' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 4 8 4 8-4M4 15l8 4 8-4"/></svg>
+            <span>Products</span>
+          </a>
+          <a class="nav-item {% if namespace == 'catalog' and url_name == 'category-list' %}is-active{% endif %}" href="{% url 'catalog:category-list' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h7v7H4V4Zm9 0h7v7h-7V4ZM4 13h7v7H4v-7Zm9 0h7v7h-7v-7Z"/></svg>
+            <span>Categories</span>
+          </a>
+        {% endif %}
+        {% if can_manage_inventory %}
+          <a class="nav-item {% if namespace == 'inventory' %}is-active{% endif %}" href="{% url 'inventory:adjustment-list' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17V7l8-4 8 4v10l-8 4-8-4Zm8-4V3m0 10 8-4m-8 4-8-4"/></svg>
+            <span>Inventory / Stock</span>
+          </a>
+        {% endif %}
+        {% if can_manage_purchases %}
+          <a class="nav-item {% if namespace == 'purchasing' %}is-active{% endif %}" href="{% url 'purchasing:purchase-list' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18H6V3Zm3 5h6M9 12h6M9 16h4"/></svg>
+            <span>Purchases</span>
+          </a>
+        {% endif %}
+        {% if can_manage_catalog %}
+          <a class="nav-item {% if namespace == 'suppliers' %}is-active{% endif %}" href="{% url 'suppliers:supplier-list' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 7h11v10H3V7Zm11 3h4l3 3v4h-7v-7ZM6 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm12 0a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg>
+            <span>Suppliers</span>
+          </a>
+        {% endif %}
+        <span class="nav-item is-disabled" aria-disabled="true">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0m8 0a4 4 0 1 1-8 0m8 0h3v8H5v-8h3"/></svg>
+          <span>Customers</span>
+          <small>Soon</small>
+        </span>
+      </div>
+    {% endif %}
+
+    {% if can_view_reports or can_manage_members or can_manage_api_keys %}
+      <div class="nav-group">
+        <div class="nav-label">Admin</div>
+        {% if can_view_reports %}
+          <a class="nav-item {% if namespace == 'audit' %}is-active{% endif %}" href="{% url 'audit:audit-list' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19V5h14v14H5Zm3-4 3-3 2 2 3-5"/></svg>
+            <span>Reports</span>
+          </a>
+        {% endif %}
+        {% if can_manage_members %}
+          <a class="nav-item {% if url_name == 'team-members' %}is-active{% endif %}" href="{% url 'team-members' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-8 0m8 0a4 4 0 1 1-8 0M4 21a8 8 0 0 1 16 0"/></svg>
+            <span>Team</span>
+          </a>
+        {% endif %}
+        {% if can_manage_api_keys %}
+          <a class="nav-item {% if url_name == 'api-key-management' %}is-active{% endif %}" href="{% url 'api-key-management' %}">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14 10a5 5 0 1 0-3 4.58L13 17h3v3h4v-4l-4.42-4.42A5 5 0 0 0 14 10Zm-7 0h.01"/></svg>
+            <span>Settings</span>
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="tenant-card-mini">
+      <span>Workspace</span>
+      <strong>{% if request.tenant %}{{ request.tenant.name }}{% else %}Select tenant{% endif %}</strong>
+    </div>
+    <button class="nav-item sidebar-collapse" type="button" data-sidebar-collapse aria-label="Collapse navigation" aria-pressed="false">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>
+      <span class="sidebar-collapse-label">Collapse</span>
+    </button>
+  </div>
+</aside>
+{% endwith %}
