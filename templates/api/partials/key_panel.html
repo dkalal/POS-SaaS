@@ -1,74 +1,8 @@
-<section id="apikey-panel" class="glass rounded-3xl p-6">
-  {% if created_key %}
-    <div class="mb-6 rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4">
-      <div class="text-sm font-semibold text-emerald-100">API key created</div>
-      <div class="mt-2 text-sm text-emerald-50/90">This secret is shown only once. Copy it now and store it securely.</div>
-      <div class="mt-4 break-all rounded-2xl border border-emerald-300/20 bg-slate-950/50 px-4 py-3 font-mono text-sm text-emerald-100">{{ raw_key }}</div>
-    </div>
-  {% endif %}
-
-  <div class="flex items-center justify-between gap-4">
-    <div>
-      <h2 class="font-display text-2xl font-semibold">Create API key</h2>
-      <p class="mt-2 text-sm text-slate-300">Only owner/admin users can manage tenant API keys.</p>
-    </div>
-    <span class="chip">{{ api_keys|length }} active</span>
-  </div>
-
-  <form class="mt-6 space-y-5" method="post" action="{% url 'api-key-management' %}" hx-post="{% url 'api-key-management' %}" hx-target="#apikey-panel" hx-swap="outerHTML">
-    {% csrf_token %}
-    {% if form.non_field_errors %}
-      <div class="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-rose-100">{{ form.non_field_errors }}</div>
-    {% endif %}
-    <div class="grid gap-4 md:grid-cols-2">
-      <div class="space-y-2 md:col-span-1">
-        <label class="text-sm font-semibold text-slate-200">Key label</label>
-        {{ form.label }}
-        {% if form.label.errors %}<div class="text-sm text-rose-200">{{ form.label.errors }}</div>{% endif %}
-        <div class="text-xs text-slate-400">Use a descriptive name like ERP sync or warehouse bridge.</div>
-      </div>
-      <div class="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 md:col-span-1">
-        {{ form.can_view_cost }}
-        <div>
-          <div class="text-sm font-semibold text-slate-100">Allow cost price access</div>
-          <div class="text-xs text-slate-400">Enable only for trusted integrations that need margin or purchase data.</div>
-        </div>
-      </div>
-    </div>
-    <div class="space-y-2">
-      <label class="text-sm font-semibold text-slate-200">Notes</label>
-      {{ form.notes }}
-      {% if form.notes.errors %}<div class="text-sm text-rose-200">{{ form.notes.errors }}</div>{% endif %}
-      <div class="text-xs text-slate-400">Optional context for audit and future cleanup.</div>
-    </div>
-    <button class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">Create key</button>
-  </form>
-
-  <div class="mt-8">
-    <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">Active keys</h3>
-    <div class="mt-4 grid gap-3">
-      {% for api_key in api_keys %}
-        <div class="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div class="font-semibold text-white">{{ api_key.label }}</div>
-              <div class="mt-1 text-sm text-slate-400">Prefix {{ api_key.key_prefix }} · {% if api_key.can_view_cost %}cost access enabled{% else %}cost access disabled{% endif %}</div>
-              <div class="mt-1 text-xs text-slate-500">Created {{ api_key.created_at }}{% if api_key.last_used_at %} · last used {{ api_key.last_used_at }}{% endif %}</div>
-            </div>
-            {% if api_key.is_active %}
-              <form method="post" action="{% url 'revoke-api-key' api_key.id %}" hx-post="{% url 'revoke-api-key' api_key.id %}" hx-target="#apikey-panel" hx-swap="outerHTML">
-                {% csrf_token %}
-                <button class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" type="submit">Revoke</button>
-              </form>
-            {% else %}
-              <span class="chip">Revoked</span>
-            {% endif %}
-          </div>
-        </div>
-      {% empty %}
-        <div class="rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-sm text-slate-400">No API keys exist yet for this tenant.</div>
-      {% endfor %}
-    </div>
-  </div>
+<section id="apikey-panel" class="content-grid split">
+  <section class="page-section">
+    {% if created_key %}<div class="message-success mb-4"><strong class="block">API key created</strong><span class="block mt-1">This secret is displayed once. Store it securely before leaving this page.</span><code class="block mt-3 break-all card-soft p-3 text-xs">{{ raw_key }}</code></div>{% endif %}
+    <div class="table-toolbar"><div><h2>Create API key</h2><p>Only owner/admin users can manage integration access.</p></div></div>
+    <form class="grid gap-4" method="post" action="{% url 'api-key-management' %}" hx-post="{% url 'api-key-management' %}" hx-target="#apikey-panel" hx-swap="outerHTML">{% csrf_token %}{% if form.non_field_errors %}<div class="message-error">{{ form.non_field_errors }}</div>{% endif %}{% include "components/form_field.html" with field=form.label %}{% include "components/form_field.html" with field=form.can_view_cost %}{% include "components/form_field.html" with field=form.notes %}<button class="button-primary justify-self-start" type="submit">Create key</button></form>
+  </section>
+  <aside class="page-section"><div class="table-toolbar"><div><h2>Issued keys</h2><p>Revoke a key immediately when an integration is retired.</p></div><span class="chip">{{ api_keys|length }} total</span></div><div class="grid gap-3">{% for api_key in api_keys %}<div class="card-soft p-3"><div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div class="min-w-0"><strong class="block break-words">{{ api_key.label }}</strong><span class="app-note block mt-1 text-sm">Prefix {{ api_key.key_prefix }} · {% if api_key.can_view_cost %}Cost access enabled{% else %}Cost access disabled{% endif %}</span><span class="app-note block mt-1 text-xs">Created {{ api_key.created_at|date:"M j, Y" }}{% if api_key.last_used_at %} · last used {{ api_key.last_used_at|date:"M j, Y H:i" }}{% endif %}</span></div>{% if api_key.is_active %}<form method="post" action="{% url 'revoke-api-key' api_key.id %}" hx-post="{% url 'revoke-api-key' api_key.id %}" hx-target="#apikey-panel" hx-swap="outerHTML">{% csrf_token %}<button class="button-danger" type="submit">Revoke</button></form>{% else %}<span class="status-pill status-danger">Revoked</span>{% endif %}</div></div>{% empty %}{% include "components/empty_state.html" with title="No API keys yet" message="Create a key only when a trusted integration needs tenant-scoped read access." %}{% endfor %}</div></aside>
 </section>
-

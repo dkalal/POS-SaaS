@@ -1,5 +1,31 @@
 from accounts.models import TenantMembership
 from core.tenant_context import reset_current_tenant_id, set_current_tenant_id
+from django.utils.cache import patch_cache_control
+
+
+class AuthenticatedResponseCacheControlMiddleware:
+    """Prevent authenticated or credential-entry pages from being reused by browser history."""
+
+    credential_paths = {"/accounts/login/", "/accounts/logout/"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        user = getattr(request, "user", None)
+        if (user is not None and user.is_authenticated) or request.path in self.credential_paths:
+            patch_cache_control(
+                response,
+                private=True,
+                no_cache=True,
+                no_store=True,
+                must_revalidate=True,
+                max_age=0,
+            )
+            response["Pragma"] = "no-cache"
+            response["Expires"] = "0"
+        return response
 
 
 class CurrentTenantMiddleware:

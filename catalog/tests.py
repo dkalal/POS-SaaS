@@ -126,6 +126,10 @@ class CatalogCrudTests(TestCase):
     def test_manager_can_create_edit_and_toggle_products(self):
         self._login_as(self.manager)
 
+        response = self.client.get(reverse("catalog:product-list"))
+        self.assertContains(response, "Networking")
+        self.assertNotContains(response, "Category object")
+
         created = self.client.post(
             reverse("catalog:product-list"),
             data={
@@ -191,6 +195,98 @@ class CatalogCrudTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "AP-200")
         self.assertNotContains(response, "RTR-001")
+
+    def test_manual_sku_is_normalized_and_unique_within_business(self):
+        self._login_as(self.manager)
+        payload = {
+            "category": self.category.id,
+            "name": "Managed Switch",
+            "sku": " sw 100 ",
+            "barcode": "",
+            "description": "",
+            "cost_price": "120.00",
+            "sale_price": "180.00",
+            "reorder_level": "4",
+            "track_inventory": "on",
+            "is_active": "on",
+        }
+
+        created = self.client.post(reverse("catalog:product-list"), data=payload)
+
+        self.assertEqual(created.status_code, 302)
+        self.assertTrue(Product.objects.filter(tenant=self.tenant, sku="SW-100").exists())
+
+        payload["name"] = "Another Switch"
+        duplicate = self.client.post(reverse("catalog:product-list"), data=payload)
+
+        self.assertEqual(duplicate.status_code, 200)
+        self.assertContains(duplicate, "A product with this SKU already exists in this business.")
+
+    def test_same_sku_is_allowed_in_another_business(self):
+        other_tenant = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+
+        Product.objects.create(
+            tenant=other_tenant,
+            name="Tenant B Router",
+            sku=self.product.sku,
+            cost_price=Decimal("50.00"),
+            sale_price=Decimal("75.00"),
+        )
+
+        self.assertEqual(Product.objects.filter(sku="RTR-001").count(), 2)
+
+    def test_blank_sku_is_generated_and_incremented_for_its_business_and_prefix(self):
+        self._login_as(self.manager)
+        payload = {
+            "category": self.category.id,
+            "name": "Dell XPS 14",
+            "sku": "",
+            "barcode": "",
+            "description": "",
+            "cost_price": "120.00",
+            "sale_price": "180.00",
+            "reorder_level": "4",
+            "track_inventory": "on",
+            "is_active": "on",
+        }
+
+        first = self.client.post(reverse("catalog:product-list"), data=payload)
+        second = self.client.post(reverse("catalog:product-list"), data=payload)
+
+        self.assertEqual(first.status_code, 302)
+        self.assertEqual(second.status_code, 302)
+        self.assertEqual(
+            list(
+                Product.objects.filter(tenant=self.tenant, name="Dell XPS 14")
+                .order_by("sku")
+                .values_list("sku", flat=True)
+            ),
+            ["NET-DELL-XPS14-001", "NET-DELL-XPS14-002"],
+        )
+
+    def test_product_sku_search_is_tenant_scoped(self):
+        self._login_as(self.manager)
+        other_tenant = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        Product.objects.create(
+            tenant=other_tenant,
+            name="Other Business Access Point",
+            sku="AP-200",
+            cost_price=Decimal("30.00"),
+            sale_price=Decimal("50.00"),
+        )
+        Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="Local Access Point",
+            sku="AP-200",
+            cost_price=Decimal("30.00"),
+            sale_price=Decimal("50.00"),
+        )
+
+        response = self.client.get(reverse("catalog:product-list"), {"q": "AP-200"})
+
+        self.assertContains(response, "Local Access Point")
+        self.assertNotContains(response, "Other Business Access Point")
 
     def test_cashier_cannot_access_catalog_management(self):
         self._login_as(self.cashier)

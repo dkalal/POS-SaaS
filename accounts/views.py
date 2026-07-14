@@ -37,7 +37,10 @@ class TenantLoginView(LoginView):
 class TenantLogoutView(LogoutView):
     def post(self, request, *args, **kwargs):
         messages.success(request, "You have been signed out.")
-        return super().post(request, *args, **kwargs)
+        response = super().post(request, *args, **kwargs)
+        # Invalidate browser-held copies of tenant data after the server session is closed.
+        response["Clear-Site-Data"] = '"cache"'
+        return response
 
 
 @contextmanager

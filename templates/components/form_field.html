@@ -1,0 +1,16 @@
+<div class="form-field">
+  {% if field.field.widget.input_type == "checkbox" %}
+    <label class="card-soft flex items-start gap-3 p-3" for="{{ field.id_for_label }}">
+      {{ field }}
+      <span>
+        <strong class="block text-sm">{{ field.label }}</strong>
+        {% if field.help_text %}<span class="form-help block mt-1">{{ field.help_text }}</span>{% endif %}
+      </span>
+    </label>
+  {% else %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="form-help">{{ field.help_text }}</p>{% endif %}
+  {% endif %}
+  {% for error in field.errors %}<p class="form-error">{{ error }}</p>{% endfor %}
+</div>

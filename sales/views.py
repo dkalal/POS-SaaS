@@ -112,11 +112,21 @@ def _clear_register_state(request, tenant):
     request.session.modified = True
 
 
+def _product_stock_quantity(product):
+    if not product.track_inventory:
+        return None
+    try:
+        return product.stock.quantity
+    except ObjectDoesNotExist:
+        return 0
+
+
 def _cart_products(tenant, cart):
     if not cart:
         return []
-    products = Product.objects.select_related("category").filter(
+    products = Product.objects.select_related("category", "stock").filter(
         tenant=tenant,
+        is_active=True,
         pk__in=[item["product_id"] for item in cart],
     )
     product_map = {product.pk: product for product in products}
@@ -131,6 +141,7 @@ def _cart_products(tenant, cart):
                 "quantity": item["quantity"],
                 "unit_price": item["unit_price"],
                 "line_total": (Decimal(item["quantity"]) * item["unit_price"]).quantize(Decimal("0.01")),
+                "stock_quantity": _product_stock_quantity(product),
             }
         )
     return lines
@@ -161,18 +172,17 @@ def _register_context(request, tenant, *, search_form=None, pricing_form=None, c
                 | Q(category__name__icontains=q)
             )
         )
+    cart_quantities = {line["product_id"]: line["quantity"] for line in cart}
     product_cards = []
     for product in products.order_by("name", "sku")[:24]:
-        stock_quantity = 0
-        try:
-            stock_quantity = product.stock.quantity
-        except ObjectDoesNotExist:
-            stock_quantity = 0
+        stock_quantity = _product_stock_quantity(product)
         product_cards.append(
             {
                 "product": product,
                 "stock_quantity": stock_quantity,
                 "category_name": product.category.name if product.category_id else "Uncategorized",
+                "quantity_in_cart": cart_quantities.get(product.pk, 0),
+                "can_add": not product.track_inventory or stock_quantity > cart_quantities.get(product.pk, 0),
             }
         )
     return {
@@ -209,9 +219,21 @@ def register(request):
     if request.method == "POST":
         action = request.POST.get("action")
         if action == "add":
-            product = Product.objects.filter(tenant=tenant, is_active=True, pk=request.POST.get("product_id")).first()
+            product = Product.objects.select_related("stock").filter(
+                tenant=tenant,
+                is_active=True,
+                pk=request.POST.get("product_id"),
+            ).first()
             if product is not None:
                 cart = _read_cart(request, tenant)
+                current_quantity = next(
+                    (line["quantity"] for line in cart if line["product_id"] == product.pk),
+                    0,
+                )
+                available_quantity = _product_stock_quantity(product)
+                if available_quantity is not None and current_quantity >= available_quantity:
+                    messages.error(request, f"{product.name} has no more stock available to add.")
+                    return redirect("sales:register")
                 for line in cart:
                     if line["product_id"] == product.pk:
                         line["quantity"] += 1
@@ -228,6 +250,18 @@ def register(request):
                 cart = _read_cart(request, tenant)
                 product_id = form.cleaned_data["product_id"]
                 quantity = form.cleaned_data["quantity"]
+                product = Product.objects.select_related("stock").filter(
+                    tenant=tenant,
+                    is_active=True,
+                    pk=product_id,
+                ).first()
+                if product is None:
+                    messages.error(request, "This product is no longer available for sale.")
+                    return redirect("sales:register")
+                available_quantity = _product_stock_quantity(product)
+                if available_quantity is not None and quantity > available_quantity:
+                    messages.error(request, f"Only {available_quantity} unit(s) of {product.name} are available.")
+                    return redirect("sales:register")
                 updated = []
                 for line in cart:
                     if line["product_id"] == product_id:
@@ -284,6 +318,9 @@ def register(request):
                     messages.error(request, "Add at least one item before checkout.")
                     return redirect("sales:register")
                 try:
+                    if len(cart_lines) != len(_read_cart(request, tenant)):
+                        messages.error(request, "A cart product is no longer available. Remove it before checkout.")
+                        return redirect("sales:register")
                     sale = complete_sale(
                         tenant=tenant,
                         cashier=request.user,
@@ -298,6 +335,7 @@ def register(request):
                         payment_method=checkout_form.cleaned_data["payment_method"],
                         discount=meta["discount"],
                         tax=meta["tax"],
+                        reference=checkout_form.cleaned_data.get("reference", ""),
                     )
                 except (InsufficientStockError, PaymentMethodNotAllowedError, DomainError) as exc:
                     messages.error(request, str(exc))

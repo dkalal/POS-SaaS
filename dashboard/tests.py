@@ -81,6 +81,9 @@ class DashboardTests(TestCase):
         self.assertContains(response, "Router")
         self.assertContains(response, "Products")
         self.assertContains(response, "1")
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertIn("private", response["Cache-Control"])
+        self.assertEqual(response["Pragma"], "no-cache")
 
     def test_tenant_switch_updates_session(self):
         self.client.force_login(self.user)

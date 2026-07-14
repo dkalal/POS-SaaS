@@ -246,6 +246,8 @@ class PurchasingUiTests(TestCase):
     def test_purchase_create_screen_creates_draft_purchase(self):
         response = self.client.get(reverse("purchasing:purchase-create"))
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, ">Main Supplier<", html=False)
+        self.assertNotContains(response, "Supplier object")
 
         created = self.client.post(
             reverse("purchasing:purchase-create"),

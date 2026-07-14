@@ -72,7 +72,15 @@ def _is_payment_method_allowed(tenant, payment_method):
     return payment_method in allowed
 
 
-def complete_sale(tenant, cashier, cart_items, payment_method, discount=Decimal("0.00"), tax=Decimal("0.00")):
+def complete_sale(
+    tenant,
+    cashier,
+    cart_items,
+    payment_method,
+    discount=Decimal("0.00"),
+    tax=Decimal("0.00"),
+    reference="",
+):
     require_tenant_role(
         cashier,
         tenant,
@@ -116,17 +124,6 @@ def complete_sale(tenant, cashier, cart_items, payment_method, discount=Decimal(
 
         for item in normalized_items:
             product = Product.objects.select_related("category").get(pk=item["product"].pk, tenant=tenant)
-            stock = _lock_or_create_stock(tenant, product)
-            quantity_before = stock.quantity
-            quantity_after = quantity_before - item["quantity"]
-            if quantity_after < 0:
-                raise InsufficientStockError(
-                    f"Insufficient stock for product {product.pk}; requested {item['quantity']}, available {quantity_before}."
-                )
-
-            stock.quantity = quantity_after
-            stock.last_movement_at = timezone.now()
-            stock.save(update_fields=["quantity", "last_movement_at"])
             SaleItem.objects.create(
                 tenant=tenant,
                 sale=sale,
@@ -137,20 +134,32 @@ def complete_sale(tenant, cashier, cart_items, payment_method, discount=Decimal(
                 line_subtotal=_money(item["quantity"] * item["unit_price"]),
                 line_total=_money(item["quantity"] * item["unit_price"]),
             )
-            StockMovement.objects.create(
-                tenant=tenant,
-                stock=stock,
-                product=product,
-                movement_type=StockMovement.MovementType.SALE_OUT,
-                reference_type=StockMovement.ReferenceType.SALE,
-                reference_id=sale.pk,
-                quantity_delta=-item["quantity"],
-                quantity_before=quantity_before,
-                quantity_after=quantity_after,
-                unit_cost=product.cost_price,
-                note=f"Sale {sale.sale_number}",
-                created_by=cashier,
-            )
+            if product.track_inventory:
+                stock = _lock_or_create_stock(tenant, product)
+                quantity_before = stock.quantity
+                quantity_after = quantity_before - item["quantity"]
+                if quantity_after < 0:
+                    raise InsufficientStockError(
+                        f"Insufficient stock for product {product.pk}; requested {item['quantity']}, available {quantity_before}."
+                    )
+
+                stock.quantity = quantity_after
+                stock.last_movement_at = timezone.now()
+                stock.save(update_fields=["quantity", "last_movement_at"])
+                StockMovement.objects.create(
+                    tenant=tenant,
+                    stock=stock,
+                    product=product,
+                    movement_type=StockMovement.MovementType.SALE_OUT,
+                    reference_type=StockMovement.ReferenceType.SALE,
+                    reference_id=sale.pk,
+                    quantity_delta=-item["quantity"],
+                    quantity_before=quantity_before,
+                    quantity_after=quantity_after,
+                    unit_cost=product.cost_price,
+                    note=f"Sale {sale.sale_number}",
+                    created_by=cashier,
+                )
 
         Payment.objects.create(
             tenant=tenant,
@@ -158,6 +167,7 @@ def complete_sale(tenant, cashier, cart_items, payment_method, discount=Decimal(
             method=payment_method,
             amount=sale.grand_total,
             status=Payment.Status.COMPLETED,
+            reference=reference or "",
             received_by=cashier,
         )
 
@@ -194,6 +204,14 @@ def cancel_sale(sale_id, cancelled_by, reason):
 
         items = list(sale.items.select_related("product").all().order_by("product_id"))
         for item in items:
+            if not StockMovement.objects.filter(
+                tenant=sale.tenant,
+                product=item.product,
+                movement_type=StockMovement.MovementType.SALE_OUT,
+                reference_type=StockMovement.ReferenceType.SALE,
+                reference_id=sale.pk,
+            ).exists():
+                continue
             stock = _lock_or_create_stock(sale.tenant, item.product)
             quantity_before = stock.quantity
             quantity_after = quantity_before + item.quantity

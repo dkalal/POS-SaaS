@@ -20,3 +20,5 @@ class Supplier(ActiveTenantScopedModel):
         ]
         ordering = ["name", "id"]
 
+    def __str__(self):
+        return self.name

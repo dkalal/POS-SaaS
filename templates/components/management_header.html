@@ -1,0 +1,13 @@
+<section class="page-section">
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div>
+      <p class="section-eyebrow">{{ section_label }}</p>
+      <h2 class="page-heading">{{ page_heading }}</h2>
+      <p class="mt-1 max-w-3xl text-sm app-note">{{ page_description }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% if secondary_url %}<a class="button-secondary" href="{{ secondary_url }}">{{ secondary_label }}</a>{% endif %}
+      {% if primary_url %}<a class="button-primary" href="{{ primary_url }}">{{ primary_label }}</a>{% endif %}
+    </div>
+  </div>
+</section>

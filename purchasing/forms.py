@@ -92,6 +92,7 @@ class PurchaseItemEntryForm(forms.Form):
             else Product.objects.none()
         )
         self.fields["product"].help_text = "Active products in this tenant only."
+        self.fields["product"].label_from_instance = lambda product: f"{product.name} ({product.sku})"
         self.fields["quantity"].widget.attrs["placeholder"] = "1"
         self.fields["unit_cost"].widget.attrs["placeholder"] = "0.00"
         for field in self.fields.values():

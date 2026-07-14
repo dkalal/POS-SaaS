@@ -1,148 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Products | POS SaaS{% endblock %}
 {% block content %}
-<div class="space-y-6">
-  <header class="glass rounded-3xl px-6 py-5 shadow-glow">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <div class="text-sm uppercase tracking-[0.22em] text-sky-200/80">Catalog</div>
-        <h1 class="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">Products</h1>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Keep the live item catalog clean, priced, and ready for sales and purchasing.</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'dashboard' %}">Dashboard</a>
-        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'catalog:category-list' %}">Categories</a>
-      </div>
+{% url 'catalog:category-list' as categories_url %}
+<div class="stack">
+  {% include "components/management_header.html" with section_label="Catalog" page_heading="Products" page_description="Maintain the live catalog used by sales, purchasing, and stock operations." secondary_url=categories_url secondary_label="Categories" %}
+  <section class="content-grid split">
+    <div class="stack">
+      <section class="page-section">
+        <div class="table-toolbar"><div><h2>Product catalog</h2><p>Search, review prices, and control product availability.</p></div><span class="chip">{{ products.paginator.count }} total</span></div>
+        <form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem_auto] md:items-end" method="get">
+          <div class="form-field"><label for="{{ product_filter.q.id_for_label }}">Search</label>{{ product_filter.q }}</div>
+          <div class="form-field"><label for="{{ product_filter.status.id_for_label }}">Status</label>{{ product_filter.status }}</div>
+          <div class="flex flex-wrap gap-2"><button class="button-primary" type="submit">Apply</button><a class="button-secondary" href="{% url 'catalog:product-list' %}">Reset</a></div>
+        </form>
+        <div class="responsive-table-wrap mt-4"><table><thead class="tabular-head"><tr><th class="text-left">Product</th><th class="text-left">SKU</th><th class="text-left">Category</th><th class="text-left">Sale price</th><th class="text-left">Status</th><th class="text-right">Actions</th></tr></thead><tbody class="tabular-body">
+          {% for product in products %}<tr><td><strong>{{ product.name }}</strong></td><td>{{ product.sku }}</td><td>{{ product.category.name|default:"Uncategorized" }}</td><td>{{ product.sale_price }}</td><td>{% if product.is_active %}<span class="status-pill status-success">Active</span>{% else %}<span class="status-pill status-warning">Inactive</span>{% endif %}</td><td><div class="flex justify-end gap-2"><a class="button-secondary" href="{% url 'catalog:product-edit' product.id %}">Edit</a><form method="post" action="{% url 'catalog:product-toggle-active' product.id %}">{% csrf_token %}<button class="{% if product.is_active %}button-danger{% else %}button-secondary{% endif %}" type="submit">{% if product.is_active %}Deactivate{% else %}Reactivate{% endif %}</button></form></div></td></tr>
+          {% empty %}<tr><td colspan="6">{% include "components/empty_state.html" with title="No products yet" message="Create the first product from the form alongside this list." %}</td></tr>{% endfor %}
+        </tbody></table></div>
+        {% include "components/pagination.html" with page_obj=products query_string=product_query_string %}
+      </section>
     </div>
-  </header>
-
-  {% if messages %}
-    <div class="space-y-3">
-      {% for message in messages %}
-        <div class="glass rounded-2xl px-4 py-3 text-sm {% if message.tags == 'error' %}border-rose-500/30 text-rose-200{% else %}border-emerald-500/25 text-emerald-100{% endif %}">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-
-  <section class="grid gap-6 lg:grid-cols-[1.25fr_0.95fr]">
-    <div class="glass rounded-3xl p-6">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <h2 class="font-display text-2xl font-semibold">Current products</h2>
-          <p class="mt-2 text-sm text-slate-300">Products are tenant-scoped and can be soft-deactivated instead of deleted.</p>
-        </div>
-        <span class="chip">{{ products.paginator.count }} total</span>
-      </div>
-
-      <form method="get" class="mt-6 grid gap-4 md:grid-cols-3">
-        <div class="space-y-2 md:col-span-2">
-          <label class="block text-sm font-medium text-slate-200" for="{{ product_filter.q.id_for_label }}">Search</label>
-          {{ product_filter.q }}
-        </div>
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-slate-200" for="{{ product_filter.status.id_for_label }}">Status</label>
-          {{ product_filter.status }}
-        </div>
-        <div class="md:col-span-3 flex flex-wrap gap-3">
-          <button class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">Apply filters</button>
-          <a class="button-secondary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'catalog:product-list' %}">Reset</a>
-        </div>
-      </form>
-
-      <div class="mt-6 overflow-hidden rounded-2xl border border-slate-800">
-        <table class="min-w-full divide-y divide-slate-800 text-sm">
-          <thead class="bg-slate-950/60 text-slate-400">
-            <tr>
-              <th class="px-4 py-3 text-left font-medium">Name</th>
-              <th class="px-4 py-3 text-left font-medium">SKU</th>
-              <th class="px-4 py-3 text-left font-medium">Category</th>
-              <th class="px-4 py-3 text-left font-medium">Sale Price</th>
-              <th class="px-4 py-3 text-left font-medium">Status</th>
-              <th class="px-4 py-3 text-right font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-800 bg-slate-950/40">
-            {% for product in products %}
-              <tr>
-                <td class="px-4 py-3 text-slate-100">{{ product.name }}</td>
-                <td class="px-4 py-3 text-slate-400">{{ product.sku }}</td>
-                <td class="px-4 py-3 text-slate-100">{{ product.category.name|default:"Uncategorized" }}</td>
-                <td class="px-4 py-3 text-slate-100">{{ product.sale_price }}</td>
-                <td class="px-4 py-3">
-                  {% if product.is_active %}
-                    <span class="chip bg-emerald-500/10 text-emerald-100">Active</span>
-                  {% else %}
-                    <span class="chip bg-slate-800/80 text-slate-300">Inactive</span>
-                  {% endif %}
-                </td>
-                <td class="px-4 py-3">
-                  <div class="flex justify-end gap-2">
-                    <a class="button-secondary rounded-2xl px-3 py-2 text-xs font-semibold" href="{% url 'catalog:product-edit' product.id %}">Edit</a>
-                    <form method="post" action="{% url 'catalog:product-toggle-active' product.id %}">
-                      {% csrf_token %}
-                      <button class="rounded-2xl px-3 py-2 text-xs font-semibold {% if product.is_active %}bg-rose-500/15 text-rose-100 hover:bg-rose-500/20{% else %}bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/20{% endif %}" type="submit">
-                        {% if product.is_active %}Deactivate{% else %}Reactivate{% endif %}
-                      </button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="6" class="px-4 py-8 text-center text-slate-400">No products yet. Create the first item in the form panel.</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      {% if products.has_other_pages %}
-        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
-          <div>Page {{ products.number }} of {{ products.paginator.num_pages }}</div>
-          <div class="flex items-center gap-2">
-            {% if products.has_previous %}
-              <a class="button-secondary rounded-2xl px-4 py-2" href="?{% if product_query_string %}{{ product_query_string }}&{% endif %}page={{ products.previous_page_number }}">Previous</a>
-            {% endif %}
-            {% if products.has_next %}
-              <a class="button-secondary rounded-2xl px-4 py-2" href="?{% if product_query_string %}{{ product_query_string }}&{% endif %}page={{ products.next_page_number }}">Next</a>
-            {% endif %}
-          </div>
-        </div>
-      {% endif %}
-    </div>
-
-    <aside class="glass rounded-3xl p-6">
-      <div>
-        <h2 class="font-display text-2xl font-semibold">Add product</h2>
-        <p class="mt-2 text-sm text-slate-300">Capture the fields needed for purchasing, sales, and inventory.</p>
-      </div>
-
-      <form class="mt-6 space-y-4" method="post">
-        {% csrf_token %}
-        {% for field in product_form %}
-          <div class="space-y-2">
-            {% if field.field.widget.input_type == "checkbox" %}
-              <label class="flex items-start gap-3 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3">
-                {{ field }}
-                <span>
-                  <span class="block text-sm font-semibold text-white">{{ field.label }}</span>
-                  {% if field.help_text %}<span class="block text-xs text-slate-400">{{ field.help_text }}</span>{% endif %}
-                </span>
-              </label>
-            {% else %}
-              <label class="block text-sm font-medium text-slate-200" for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.help_text %}<p class="text-xs text-slate-400">{{ field.help_text }}</p>{% endif %}
-            {% endif %}
-            {% for error in field.errors %}
-              <p class="text-xs text-rose-200">{{ error }}</p>
-            {% endfor %}
-          </div>
-        {% endfor %}
-        <button class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">Create product</button>
-      </form>
+    <aside class="page-section">
+      <div class="table-toolbar"><div><h2>Add product</h2><p>Capture the details operations need from day one.</p></div></div>
+      <form class="grid gap-4" method="post">{% csrf_token %}{% for field in product_form %}{% include "components/form_field.html" with field=field %}{% endfor %}<button class="button-primary justify-self-start" type="submit">Create product</button></form>
     </aside>
   </section>
 </div>

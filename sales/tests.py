@@ -99,6 +99,30 @@ class SalesServiceTests(TransactionTestCase):
         self.assertEqual(movement.movement_type, StockMovement.MovementType.SALE_OUT)
         self.assertEqual(Receipt.objects.filter(sale=sale).count(), 1)
 
+    def test_complete_sale_records_payment_reference_and_skips_stock_for_services(self):
+        service = Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="Setup service",
+            sku="SETUP-001",
+            cost_price=Decimal("0.00"),
+            sale_price=Decimal("25.00"),
+            track_inventory=False,
+            is_active=True,
+        )
+
+        sale = complete_sale(
+            tenant=self.tenant,
+            cashier=self.cashier,
+            cart_items=[{"product": service, "quantity": 1, "unit_price": Decimal("25.00")}],
+            payment_method=Payment.Method.MOBILE_MONEY,
+            reference="MOBILE-REF-42",
+        )
+
+        self.assertEqual(Payment.objects.get(sale=sale).reference, "MOBILE-REF-42")
+        self.assertFalse(Stock.objects.filter(tenant=self.tenant, product=service).exists())
+        self.assertFalse(StockMovement.objects.filter(tenant=self.tenant, product=service).exists())
+
     def test_complete_sale_concurrent_attempts_only_one_succeeds(self):
         barrier = Barrier(2)
 
@@ -212,7 +236,7 @@ class SalesRegisterViewTests(TransactionTestCase):
     def test_register_page_renders_for_cashier(self):
         response = self.client.get(reverse("sales:register"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Fast checkout")
+        self.assertContains(response, "Product catalog")
         self.assertContains(response, "USB Adapter")
 
     def test_register_adds_item_and_completes_sale(self):
@@ -241,3 +265,13 @@ class SalesRegisterViewTests(TransactionTestCase):
         self.assertEqual(Sale.objects.count(), 1)
         self.assertEqual(Payment.objects.count(), 1)
         self.assertEqual(Stock.objects.get(pk=self.product.stock.pk).quantity, 3)
+        self.assertEqual(Payment.objects.get().reference, "ref-1")
+
+    def test_register_prevents_adding_more_than_available_stock(self):
+        for _ in range(4):
+            response = self.client.post(reverse("sales:register"), {"action": "add", "product_id": self.product.id})
+            self.assertEqual(response.status_code, 302)
+
+        response = self.client.post(reverse("sales:register"), {"action": "add", "product_id": self.product.id}, follow=True)
+
+        self.assertContains(response, "has no more stock available to add")

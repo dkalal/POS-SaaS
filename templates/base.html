@@ -131,8 +131,7 @@
     .tenant-card-mini { display: grid; gap: 0.15rem; border: 1px solid var(--border); background: var(--panel-muted); border-radius: 0.55rem; padding: 0.7rem; }
     .tenant-card-mini span { color: var(--muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
     .tenant-card-mini strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.86rem; }
-    .topbar-collapse,
-    .sidebar-collapse { display: none; }
+    .topbar-sidebar-trigger { display: none; }
     .admin-content { min-width: 0; display: flex; flex-direction: column; }
     .admin-topbar {
       position: sticky;
@@ -176,6 +175,33 @@
     .stack { display: grid; gap: 1rem; }
     .content-grid { display: grid; gap: 1rem; }
     .content-grid.split { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.9fr); align-items: start; }
+    .register-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(21rem, 0.56fr); gap: 1rem; align-items: start; }
+    .register-catalog, .register-cart { min-width: 0; }
+    .register-cart { position: sticky; top: 5.25rem; }
+    .register-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; width: min(100%, 38rem); }
+    .register-product-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .register-product { display: grid; gap: 0.85rem; min-height: 11.5rem; padding: 0.9rem; border: 1px solid var(--border); border-radius: 0.6rem; background: var(--panel); box-shadow: var(--shadow); }
+    .register-product-head, .register-product-foot, .register-line-head, .register-line-foot, .register-total-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+    .register-product-head { align-items: flex-start; }
+    .register-product-stock { flex: 0 0 auto; align-self: flex-start; white-space: nowrap; }
+    .register-product-meta { min-width: 0; display: grid; gap: 0.18rem; }
+    .register-product-action { flex: 0 0 8.25rem; display: flex; justify-content: flex-end; align-self: flex-end; }
+    .register-product-action .button-primary { width: 100%; min-height: 2.4rem; }
+    .register-product-category, .register-line-meta, .register-stock-note { color: var(--muted); font-size: 0.75rem; }
+    .register-product-name { margin: 0.18rem 0 0; font-size: 0.98rem; line-height: 1.35; font-weight: 800; overflow-wrap: anywhere; }
+    .register-price { font-size: 1.2rem; line-height: 1; font-weight: 800; }
+    .register-stock-note { font-weight: 700; }
+    .register-line-list { display: grid; gap: 0.65rem; max-height: 31rem; overflow-y: auto; padding-right: 0.1rem; }
+    .register-line { display: grid; gap: 0.7rem; border: 1px solid var(--border); border-radius: 0.55rem; background: var(--panel-muted); padding: 0.8rem; }
+    .register-quantity { display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+    .register-quantity input { width: 4.5rem; min-height: 2.15rem; padding: 0.38rem 0.45rem; }
+    .register-total-list { display: grid; gap: 0.7rem; margin: 0; }
+    .register-total-list dt { color: var(--muted); font-size: 0.82rem; }
+    .register-total-list dd { margin: 0; font-weight: 750; }
+    .register-total-row.grand-total { margin-top: 0.2rem; padding-top: 0.8rem; border-top: 1px dashed var(--border-strong); font-size: 1.05rem; }
+    .register-total-row.grand-total dd { font-size: 1.25rem; }
+    .register-modal-summary { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 1px solid var(--border); border-radius: 0.55rem; background: var(--panel-muted); padding: 0.8rem; }
+    button:disabled { cursor: not-allowed; opacity: 0.52; }
     .page-section, .surface, .surface-strong, .stat-tile { border: 1px solid var(--border); background: var(--panel); border-radius: 0.65rem; box-shadow: var(--shadow); }
     .page-section { padding: 1rem; }
     .surface-strong { background: var(--panel); }
@@ -228,6 +254,38 @@
     .status-success { background: var(--success-soft); color: var(--success); }
     .status-warning { background: var(--warning-soft); color: var(--warning); }
     .status-danger { background: var(--danger-soft); color: var(--danger); }
+    /* Compatibility layer for the first management screens while they use the shared shell. */
+    .glass {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      box-shadow: var(--shadow);
+    }
+    .glass.rounded-3xl, .glass.rounded-2xl,
+    .glass .rounded-3xl, .glass .rounded-2xl { border-radius: 0.65rem !important; }
+    .glass .text-white, .glass .text-slate-100, .glass .text-slate-200 { color: var(--text) !important; }
+    .glass .text-slate-300, .glass .text-slate-400, .glass .text-slate-500 { color: var(--muted) !important; }
+    .glass .text-sky-200, .glass .text-sky-300, .glass .text-sky-100 { color: var(--primary-strong) !important; }
+    .glass .text-emerald-100, .glass .text-emerald-50 { color: var(--success) !important; }
+    .glass .text-rose-100, .glass .text-rose-200 { color: var(--danger) !important; }
+    .glass .bg-slate-950\/40, .glass .bg-slate-950\/50, .glass .bg-slate-950\/60 { background: var(--panel-muted) !important; }
+    .glass .bg-slate-800\/80 { background: var(--panel-muted) !important; }
+    .glass .border-slate-800, .glass .border-slate-700 { border-color: var(--border) !important; }
+    .glass .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: var(--border) !important; }
+    .glass .button-primary, .glass .button-secondary, .glass .button-danger { border-radius: 0.5rem !important; }
+    .glass .chip { background: var(--panel-muted); color: var(--soft); }
+    .glass .bg-emerald-500\/10 { background: var(--success-soft) !important; }
+    .glass .bg-rose-500\/10, .glass .bg-rose-500\/15 { background: var(--danger-soft) !important; }
+    .glass .bg-sky-500\/10 { background: var(--primary-soft) !important; }
+    .glass .bg-emerald-500\/15 { background: var(--success-soft) !important; }
+    .page-heading { margin: 0; font-size: 1.35rem; line-height: 1.25; font-weight: 800; }
+    .section-eyebrow { margin: 0 0 0.35rem; color: var(--muted); font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+    .form-field { display: grid; gap: 0.35rem; }
+    .form-field > label { color: var(--soft); font-size: 0.8rem; font-weight: 750; }
+    .form-help, .form-error { margin: 0; font-size: 0.76rem; }
+    .form-help { color: var(--muted); }
+    .form-error { color: var(--danger); }
+    .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 0.9rem; color: var(--muted); font-size: 0.82rem; }
     .sidebar-backdrop { position: fixed; inset: 0; z-index: 55; background: rgba(15, 23, 42, 0.46); opacity: 0; pointer-events: none; transition: opacity 0.18s ease; }
     html.sidebar-open .sidebar-backdrop { opacity: 1; pointer-events: auto; }
     html.sidebar-collapsed .admin-layout { grid-template-columns: 78px minmax(0, 1fr); }
@@ -242,26 +300,49 @@
     html.sidebar-collapsed .sidebar-head { justify-content: center; }
     html.sidebar-collapsed .sidebar-collapse svg { transform: rotate(180deg); }
     html.sidebar-collapsed .sidebar-collapse { width: 100%; justify-content: center; }
-    html.sidebar-collapsed .topbar-collapse { display: inline-grid; }
-    .sidebar-collapse {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-start;
-    }
+    html.sidebar-collapsed .topbar-sidebar-trigger { display: inline-grid; }
     @media (max-width: 1200px) {
       .stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .content-grid.split { grid-template-columns: 1fr; }
+      .register-layout { grid-template-columns: 1fr; }
+      .register-cart { position: static; }
     }
     @media (max-width: 860px) {
       .admin-layout { grid-template-columns: 1fr; }
       .admin-sidebar { position: fixed; left: 0; transform: translateX(-100%); width: min(20rem, 88vw); box-shadow: 0 24px 40px rgba(15, 23, 42, 0.18); }
       html.sidebar-open .admin-sidebar { transform: translateX(0); }
-      .topbar-collapse { display: inline-grid; }
+      html.sidebar-open { overflow: hidden; }
+      .topbar-sidebar-trigger { display: inline-grid; }
       .sidebar-collapse { display: none; }
+      html.sidebar-collapsed .admin-layout { grid-template-columns: 1fr; }
+      html.sidebar-collapsed .admin-sidebar { width: min(20rem, 88vw); }
+      html.sidebar-collapsed .brand-copy,
+      html.sidebar-collapsed .nav-label,
+      html.sidebar-collapsed .nav-item span,
+      html.sidebar-collapsed .nav-item small,
+      html.sidebar-collapsed .tenant-card-mini,
+      html.sidebar-collapsed .sidebar-collapse-label { display: initial; }
+      html.sidebar-collapsed .brand-copy,
+      html.sidebar-collapsed .tenant-card-mini { display: grid; }
+      html.sidebar-collapsed .nav-label,
+      html.sidebar-collapsed .nav-item span,
+      html.sidebar-collapsed .nav-item small,
+      html.sidebar-collapsed .sidebar-collapse-label { display: inline; }
+      html.sidebar-collapsed .nav-item { justify-content: flex-start; }
+      html.sidebar-collapsed .sidebar-head { justify-content: space-between; }
       .account-copy, .tenant-context { display: none; }
       .main-region { padding: 0.85rem; }
       .stat-grid { grid-template-columns: 1fr; }
       .admin-topbar { padding: 0.65rem 0.85rem; }
+      .register-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .register-search { width: 100%; }
+    }
+    @media (max-width: 520px) {
+      .register-product-grid { grid-template-columns: 1fr; }
+      .register-search { grid-template-columns: 1fr; }
+      .register-product-foot { align-items: stretch; }
+      .register-product-action { flex-basis: 7.5rem; align-self: stretch; }
+      .register-line-foot { align-items: flex-end; }
     }
   </style>
 </head>
@@ -287,7 +368,17 @@
   {% if request.user.is_authenticated %}
       </div>
     </div>
-    <button class="sidebar-backdrop" type="button" data-sidebar-dismiss aria-label="Close navigation"></button>
+    <button class="sidebar-backdrop" type="button" data-sidebar-close aria-label="Close navigation"></button>
+    <script>
+      (function () {
+        window.addEventListener("pageshow", function (event) {
+          // A restored BFCache page can contain tenant data from before logout.
+          if (event.persisted) {
+            window.location.reload();
+          }
+        });
+      }());
+    </script>
   {% endif %}
   <script>
     (function () {
@@ -296,6 +387,7 @@
       var collapseKey = "pos-saas-sidebar-collapsed";
       var themeButton = document.querySelector("[data-theme-toggle]");
       var collapseButton = document.querySelector("[data-sidebar-collapse]");
+      var sidebarTriggers = Array.prototype.slice.call(document.querySelectorAll("[data-sidebar-trigger]"));
       function setTheme(theme) {
         root.dataset.theme = theme;
         root.style.colorScheme = theme;
@@ -304,12 +396,22 @@
           themeButton.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
         }
       }
+      function syncSidebarControls() {
+        var isMobile = mobileQuery && mobileQuery.matches;
+        var sidebarOpen = root.classList.contains("sidebar-open");
+        var sidebarCollapsed = root.classList.contains("sidebar-collapsed");
+        sidebarTriggers.forEach(function (button) {
+          button.setAttribute("aria-expanded", isMobile ? (sidebarOpen ? "true" : "false") : (sidebarCollapsed ? "false" : "true"));
+          button.setAttribute("aria-label", isMobile ? "Open navigation" : "Expand navigation");
+        });
+      }
       function setSidebarCollapsed(collapsed) {
         root.classList.toggle("sidebar-collapsed", collapsed);
         if (collapseButton) {
           collapseButton.setAttribute("aria-pressed", collapsed ? "true" : "false");
         }
         try { localStorage.setItem(collapseKey, collapsed ? "true" : "false"); } catch (error) {}
+        syncSidebarControls();
       }
       if (themeButton) {
         themeButton.addEventListener("click", function () {
@@ -321,10 +423,16 @@
         setSidebarCollapsed(localStorage.getItem(collapseKey) === "true");
       } catch (error) {}
 
-      document.querySelectorAll("[data-sidebar-trigger]").forEach(function (button) {
+      var mobileQuery = window.matchMedia("(max-width: 860px)");
+      function closeMobileSidebar() {
+        root.classList.remove("sidebar-open");
+        syncSidebarControls();
+      }
+      sidebarTriggers.forEach(function (button) {
         button.addEventListener("click", function () {
-          if (window.matchMedia("(max-width: 860px)").matches) {
+          if (mobileQuery.matches) {
             root.classList.add("sidebar-open");
+            syncSidebarControls();
             return;
           }
           if (root.classList.contains("sidebar-collapsed")) {
@@ -334,17 +442,37 @@
       });
       document.querySelectorAll("[data-sidebar-collapse]").forEach(function (button) {
         button.addEventListener("click", function () {
+          if (mobileQuery.matches) {
+            return;
+          }
           setSidebarCollapsed(!root.classList.contains("sidebar-collapsed"));
         });
       });
-      document.querySelectorAll("[data-sidebar-dismiss]").forEach(function (button) {
-        button.addEventListener("click", function () {
-          root.classList.remove("sidebar-open");
+      document.querySelectorAll("[data-sidebar-close]").forEach(function (button) {
+        button.addEventListener("click", closeMobileSidebar);
+      });
+      document.querySelectorAll("[data-sidebar] a").forEach(function (link) {
+        link.addEventListener("click", function () {
+          if (mobileQuery.matches) {
+            closeMobileSidebar();
+          }
         });
       });
+      if (mobileQuery.addEventListener) {
+        mobileQuery.addEventListener("change", function () {
+          closeMobileSidebar();
+          syncSidebarControls();
+        });
+      } else if (mobileQuery.addListener) {
+        mobileQuery.addListener(function () {
+          closeMobileSidebar();
+          syncSidebarControls();
+        });
+      }
+      syncSidebarControls();
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") {
-          root.classList.remove("sidebar-open");
+          closeMobileSidebar();
         }
       });
     }());

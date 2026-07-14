@@ -49,7 +49,7 @@
           <tbody class="divide-y divide-slate-800 bg-slate-950/40">
             {% for item in items %}
               <tr>
-                <td class="px-4 py-3 text-slate-100">{{ item.product.name }}</td>
+                <td class="px-4 py-3 text-slate-100"><div>{{ item.product.name }}</div><div class="mt-1 text-xs text-slate-400">SKU {{ item.product.sku }}</div></td>
                 <td class="px-4 py-3 text-slate-100">{{ item.quantity }}</td>
                 <td class="px-4 py-3 text-slate-100">{{ item.unit_cost }}</td>
                 <td class="px-4 py-3 text-slate-100">{{ item.line_total }}</td>

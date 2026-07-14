@@ -43,6 +43,18 @@ class AuthFlowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Username or email")
         self.assertContains(response, "Tenant-scoped")
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertEqual(response["Pragma"], "no-cache")
+
+    def test_logout_clears_browser_cache_and_session(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("logout"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Clear-Site-Data"], '"cache"')
+        self.assertIn("no-store", response["Cache-Control"])
+        self.assertNotIn("_auth_user_id", self.client.session)
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")

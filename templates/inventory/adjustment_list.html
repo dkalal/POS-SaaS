@@ -1,103 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Stock Adjustments | POS SaaS{% endblock %}
 {% block content %}
-<div class="space-y-6">
-  <header class="glass rounded-3xl px-6 py-5 shadow-glow">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <div class="text-sm uppercase tracking-[0.22em] text-sky-200/80">Inventory</div>
-        <h1 class="mt-2 font-display text-3xl font-bold text-white sm:text-4xl">Stock adjustments</h1>
-        <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-300">Draft stock corrections here, then post or cancel them without breaking the movement ledger.</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-3">
-        <a class="button-secondary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'dashboard' %}">Dashboard</a>
-        <a class="button-primary rounded-2xl px-4 py-2 text-sm font-semibold" href="{% url 'inventory:adjustment-create' %}">New adjustment</a>
-      </div>
-    </div>
-  </header>
-
-  {% if messages %}
-    <div class="space-y-3">
-      {% for message in messages %}
-        <div class="glass rounded-2xl px-4 py-3 text-sm {% if message.tags == 'error' %}border-rose-500/30 text-rose-200{% else %}border-emerald-500/25 text-emerald-100{% endif %}">
-          {{ message }}
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
-
-  <section class="glass rounded-3xl p-6">
-    <form method="get" class="space-y-4">
-      <div class="grid gap-4 md:grid-cols-3">
-        <div class="space-y-2 md:col-span-2">
-          <label class="block text-sm font-medium text-slate-200" for="{{ adjustment_filter.q.id_for_label }}">Search</label>
-          {{ adjustment_filter.q }}
-        </div>
-        <div class="space-y-2">
-          <label class="block text-sm font-medium text-slate-200" for="{{ adjustment_filter.status.id_for_label }}">Status</label>
-          {{ adjustment_filter.status }}
-        </div>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <button class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">Apply filters</button>
-        <a class="button-secondary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'inventory:adjustment-list' %}">Reset</a>
-      </div>
-    </form>
+{% url 'inventory:adjustment-create' as create_url %}
+<div class="stack">
+  {% include "components/management_header.html" with section_label="Inventory" page_heading="Stock adjustments" page_description="Record count corrections as drafts, then post or cancel them while preserving the movement ledger." primary_url=create_url primary_label="New adjustment" %}
+  <section class="page-section">
+    <form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_15rem_auto] md:items-end" method="get"><div class="form-field"><label for="{{ adjustment_filter.q.id_for_label }}">Search</label>{{ adjustment_filter.q }}</div><div class="form-field"><label for="{{ adjustment_filter.status.id_for_label }}">Status</label>{{ adjustment_filter.status }}</div><div class="flex flex-wrap gap-2"><button class="button-primary" type="submit">Apply</button><a class="button-secondary" href="{% url 'inventory:adjustment-list' %}">Reset</a></div></form>
   </section>
-
-  <section class="glass rounded-3xl p-6">
-    <div class="overflow-hidden rounded-2xl border border-slate-800">
-      <table class="min-w-full divide-y divide-slate-800 text-sm">
-        <thead class="bg-slate-950/60 text-slate-400">
-          <tr>
-            <th class="px-4 py-3 text-left font-medium">Number</th>
-            <th class="px-4 py-3 text-left font-medium">Reason</th>
-            <th class="px-4 py-3 text-left font-medium">Status</th>
-            <th class="px-4 py-3 text-left font-medium">Lines</th>
-            <th class="px-4 py-3 text-left font-medium">Net delta</th>
-            <th class="px-4 py-3 text-right font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-800 bg-slate-950/40">
-          {% for adjustment in adjustments %}
-            <tr>
-              <td class="px-4 py-3 text-slate-100">{{ adjustment.adjustment_number }}</td>
-              <td class="px-4 py-3 text-slate-100">{{ adjustment.reason }}</td>
-              <td class="px-4 py-3">
-                <span class="chip {% if adjustment.status == 'draft' %}bg-sky-500/10 text-sky-100{% elif adjustment.status == 'posted' %}bg-emerald-500/10 text-emerald-100{% else %}bg-slate-800/80 text-slate-300{% endif %}">
-                  {{ adjustment.get_status_display }}
-                </span>
-              </td>
-              <td class="px-4 py-3 text-slate-100">{{ adjustment.item_count|default:0 }}</td>
-              <td class="px-4 py-3 text-slate-100">{{ adjustment.net_delta|default:0 }}</td>
-              <td class="px-4 py-3">
-                <div class="flex justify-end gap-2">
-                  <a class="button-secondary rounded-2xl px-3 py-2 text-xs font-semibold" href="{% url 'inventory:adjustment-detail' adjustment.id %}">Open</a>
-                </div>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="6" class="px-4 py-8 text-center text-slate-400">No stock adjustments yet. Start one with the New adjustment button.</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    {% if adjustments.has_other_pages %}
-      <div class="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
-        <div>Page {{ adjustments.number }} of {{ adjustments.paginator.num_pages }}</div>
-        <div class="flex items-center gap-2">
-          {% if adjustments.has_previous %}
-            <a class="button-secondary rounded-2xl px-4 py-2" href="?{% if adjustment_query_string %}{{ adjustment_query_string }}&{% endif %}page={{ adjustments.previous_page_number }}">Previous</a>
-          {% endif %}
-          {% if adjustments.has_next %}
-            <a class="button-secondary rounded-2xl px-4 py-2" href="?{% if adjustment_query_string %}{{ adjustment_query_string }}&{% endif %}page={{ adjustments.next_page_number }}">Next</a>
-          {% endif %}
-        </div>
-      </div>
-    {% endif %}
-  </section>
+  <section class="page-section"><div class="table-toolbar"><div><h2>Adjustment history</h2><p>Open a record to review its lines and allowed lifecycle actions.</p></div></div><div class="responsive-table-wrap"><table><thead class="tabular-head"><tr><th class="text-left">Number</th><th class="text-left">Reason</th><th class="text-left">Status</th><th class="text-left">Lines</th><th class="text-left">Net delta</th><th class="text-right">Action</th></tr></thead><tbody class="tabular-body">{% for adjustment in adjustments %}<tr><td><strong>{{ adjustment.adjustment_number }}</strong></td><td>{{ adjustment.reason }}</td><td>{% if adjustment.status == 'posted' %}<span class="status-pill status-success">{{ adjustment.get_status_display }}</span>{% elif adjustment.status == 'draft' %}<span class="status-pill status-warning">{{ adjustment.get_status_display }}</span>{% else %}<span class="status-pill status-danger">{{ adjustment.get_status_display }}</span>{% endif %}</td><td>{{ adjustment.item_count|default:0 }}</td><td>{{ adjustment.net_delta|default:0 }}</td><td class="text-right"><a class="button-secondary" href="{% url 'inventory:adjustment-detail' adjustment.id %}">Open</a></td></tr>{% empty %}<tr><td colspan="6">{% include "components/empty_state.html" with title="No stock adjustments" message="Create a draft adjustment when a stock count needs correction." action_url=create_url action_label="New adjustment" %}</td></tr>{% endfor %}</tbody></table></div>{% include "components/pagination.html" with page_obj=adjustments query_string=adjustment_query_string %}</section>
 </div>
 {% endblock %}
