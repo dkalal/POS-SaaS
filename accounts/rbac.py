@@ -21,13 +21,12 @@ class RoleGuard:
 def user_has_tenant_role(user, tenant, allowed_roles):
     if not getattr(user, "is_authenticated", False) or tenant is None:
         return False
-    if not tenant.is_active:
+    if not tenant.is_active or tenant.status not in (tenant.Status.TRIAL, tenant.Status.ACTIVE):
         return False
-    if user.is_superuser:
-        return True
     return TenantMembership.objects.filter(
         tenant=tenant,
         user=user,
+        status=TenantMembership.Status.ACTIVE,
         is_active=True,
         role__in=allowed_roles,
     ).exists()

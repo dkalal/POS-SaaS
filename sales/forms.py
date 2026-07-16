@@ -13,8 +13,9 @@ class RegisterSearchForm(forms.Form):
         self.fields["q"].widget.attrs.update(
             {
                 "class": "app-field",
-                "placeholder": "Search products, SKU, barcode, or category",
+                "placeholder": "Search SKU, product name, or barcode…",
                 "autocomplete": "off",
+                "autofocus": "autofocus",
             }
         )
 

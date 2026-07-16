@@ -12,43 +12,30 @@ def session_identity(request):
                 tenant=tenant,
                 user=user,
                 tenant__is_active=True,
+                status=TenantMembership.Status.ACTIVE,
                 is_active=True,
             )
             .only("role")
             .first()
         )
 
+    owner_roles = (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN)
     is_owner_admin = bool(
         getattr(user, "is_authenticated", False)
-        and (
-            getattr(user, "is_superuser", False)
-            or (membership is not None and membership.role == TenantMembership.Role.OWNER_ADMIN)
-        )
+        and membership is not None and membership.role in owner_roles
     )
     is_manager_or_above = bool(
         getattr(user, "is_authenticated", False)
-        and (
-            getattr(user, "is_superuser", False)
-            or (
-                membership is not None
-                and membership.role
-                in (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.MANAGER)
-            )
-        )
+        and membership is not None
+        and membership.role in owner_roles + (TenantMembership.Role.MANAGER,)
     )
     can_open_register = bool(
         getattr(user, "is_authenticated", False)
-        and (
-            getattr(user, "is_superuser", False)
-            or (
-                membership is not None
-                and membership.role
-                in (
-                    TenantMembership.Role.OWNER_ADMIN,
-                    TenantMembership.Role.MANAGER,
-                    TenantMembership.Role.CASHIER,
-                )
-            )
+        and membership is not None
+        and membership.role in (
+            *owner_roles,
+            TenantMembership.Role.MANAGER,
+            TenantMembership.Role.CASHIER,
         )
     )
 
@@ -61,4 +48,11 @@ def session_identity(request):
         "can_manage_purchases": is_manager_or_above,
         "can_manage_inventory": is_manager_or_above,
         "can_view_reports": is_owner_admin,
+        "available_workspaces": (
+            TenantMembership.objects.select_related("tenant")
+            .filter(user=user, status=TenantMembership.Status.ACTIVE, is_active=True,
+                    tenant__is_active=True, tenant__status__in=("trial", "active"))
+            .order_by("tenant__name")
+            if getattr(user, "is_authenticated", False) else TenantMembership.objects.none()
+        ),
     }

@@ -1,0 +1,13 @@
+<header class="register-workspace-header">
+  <div class="flex min-w-0 items-center gap-3">
+    <a class="brand-lockup" href="{% url 'dashboard' %}" aria-label="Return to dashboard">
+      <span class="brand-mark">POS</span>
+      <span class="brand-copy"><strong class="brand-title">Register</strong><span class="brand-subtitle">{{ tenant.name }}</span></span>
+    </a>
+    <span class="status-pill status-success hidden sm:inline-flex">Live sale</span>
+  </div>
+  <div class="flex min-w-0 items-center gap-2">
+    <span class="chip hidden md:inline-flex">{{ request.user.get_username }}{% if current_membership %} · {{ current_membership.get_role_display }}{% endif %}</span>
+    <a class="button-secondary" href="{% url 'dashboard' %}">Dashboard</a>
+  </div>
+</header>

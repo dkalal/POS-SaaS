@@ -1,0 +1,31 @@
+{% with url_name=request.resolver_match.url_name %}
+<header class="admin-topbar">
+  <div class="topbar-left">
+    <button class="icon-button topbar-sidebar-trigger" type="button" data-sidebar-trigger aria-label="Open navigation">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div>
+      <div class="breadcrumb-line"><span>Platform administration</span><span>/</span><span>{% if url_name == 'tenant-list' %}Tenants{% elif url_name == 'tenant-create' %}Create tenant{% elif url_name == 'tenant-detail' %}Tenant details{% elif url_name == 'plan-list' %}Subscription plans{% elif url_name == 'plan-create' %}Create plan{% elif url_name == 'plan-edit' %}Edit plan{% else %}Overview{% endif %}</span></div>
+      <h1 class="shell-page-title">{% if url_name == 'tenant-list' %}Tenants{% elif url_name == 'tenant-create' %}Create tenant{% elif url_name == 'tenant-detail' %}Tenant details{% elif url_name == 'plan-list' %}Subscription plans{% elif url_name == 'plan-create' %}Create subscription plan{% elif url_name == 'plan-edit' %}Edit subscription plan{% else %}Platform overview{% endif %}</h1>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="tenant-context" title="Platform-only access"><span class="status-dot"></span><span>Platform operator</span></span>
+    <button class="icon-button" type="button" data-theme-toggle aria-label="Toggle light and dark theme">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg>
+    </button>
+    <details class="account-menu">
+      <summary aria-label="Open account menu">
+        <span class="avatar">{{ request.user.get_username|slice:":1" }}</span>
+        <span class="account-copy"><strong>{{ request.user.get_username }}</strong><span>Platform admin</span></span>
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="account-panel">
+        <div class="account-row"><span>Signed in</span><strong>{{ request.user.get_username }}</strong></div>
+        <div class="account-row"><span>Scope</span><strong>Platform only</strong></div>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="button-danger" type="submit">Sign out</button></form>
+      </div>
+    </details>
+  </div>
+</header>
+{% endwith %}

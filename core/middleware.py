@@ -1,6 +1,7 @@
 from accounts.models import TenantMembership
 from core.tenant_context import reset_current_tenant_id, set_current_tenant_id
 from django.utils.cache import patch_cache_control
+from django.shortcuts import redirect
 
 
 class AuthenticatedResponseCacheControlMiddleware:
@@ -42,6 +43,18 @@ class CurrentTenantMiddleware:
         if tenant is not None:
             token = set_current_tenant_id(tenant.pk)
         try:
+            verification = getattr(getattr(request, "user", None), "email_verification", None)
+            public_account_path = request.path.startswith("/accounts/") and any(
+                marker in request.path for marker in ("/signup", "/verify", "/login", "/logout", "/invitations/")
+            )
+            if (
+                getattr(request.user, "is_authenticated", False)
+                and tenant is not None
+                and verification is not None
+                and not verification.is_verified
+                and not public_account_path
+            ):
+                return redirect("verify_required")
             return self.get_response(request)
         finally:
             if token is not None:
@@ -56,6 +69,8 @@ class CurrentTenantMiddleware:
                     user=request.user,
                     tenant_id=selected_tenant_id,
                     tenant__is_active=True,
+                    tenant__status__in=("trial", "active"),
+                    status=TenantMembership.Status.ACTIVE,
                     is_active=True,
                 )
                 .first()
@@ -66,7 +81,7 @@ class CurrentTenantMiddleware:
 
         memberships = (
             TenantMembership.objects.select_related("tenant")
-            .filter(user=request.user, tenant__is_active=True, is_active=True)
+            .filter(user=request.user, tenant__is_active=True, tenant__status__in=("trial", "active"), status=TenantMembership.Status.ACTIVE, is_active=True)
             .order_by("tenant_id")
         )
         memberships = list(memberships[:2])

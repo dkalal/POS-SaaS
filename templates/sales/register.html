@@ -1,196 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Register | POS SaaS{% endblock %}
 {% block content %}
-<div class="stack">
-  <section class="page-section">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <div class="section-eyebrow">Sales</div>
-        <h2 class="page-heading">Register</h2>
-        <p class="mt-2 app-note">Add available catalog items, confirm payment, and issue a completed sale.</p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="chip">{{ tenant.name }}</span>
-        <span class="chip">{{ cart_count }} item{{ cart_count|pluralize }}</span>
-        <button class="button-secondary" type="button" data-open-modal="pricing-modal">Discount and tax</button>
-        <a class="button-secondary" href="{% url 'dashboard' %}">Dashboard</a>
-      </div>
-    </div>
-  </section>
-
+<div class="stack register-workspace">
   <section class="register-layout">
     <section class="page-section register-catalog">
-      <div class="table-toolbar">
-        <div>
-          <h2>Product catalog</h2>
-          <p>Only active products are available at the register.</p>
-        </div>
-        <span class="chip">{{ products|length }} shown</span>
-      </div>
-      <form class="register-search" method="get" role="search">
-        <label class="sr-only" for="{{ search_form.q.id_for_label }}">Search products</label>
-        {{ search_form.q }}
-        {% if search_form.q.value %}
-          <a class="button-secondary" href="{% url 'sales:register' %}">Clear</a>
-        {% else %}
-          <button class="button-primary" type="submit">Search</button>
-        {% endif %}
+      <div class="table-toolbar"><div><div class="section-eyebrow">Sales workspace</div><h2>Find products</h2><p>Search the active catalog or browse a category.</p></div><span class="chip">{{ product_page.paginator.count }} products</span></div>
+      <form class="register-search" method="get" role="search" data-register-search>
+        {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+        <label class="sr-only" for="{{ search_form.q.id_for_label }}">Search products</label>{{ search_form.q }}
+        {% if search_form.q.value or selected_category %}<a class="button-secondary" href="{% url 'sales:register' %}">Clear</a>{% else %}<button class="button-primary" type="submit">Search</button>{% endif %}
       </form>
-
-      <div class="register-product-grid">
-        {% for item in products %}
-          <article class="register-product">
-            <div class="register-product-head">
-              <div class="min-w-0">
-                <div class="register-product-category">{{ item.category_name }}</div>
-                <h3 class="register-product-name">{{ item.product.name }}</h3>
-              </div>
-              {% if item.product.track_inventory %}
-                <span class="status-pill register-product-stock {% if item.stock_quantity %}status-success{% else %}status-danger{% endif %}">{{ item.stock_quantity }} in stock</span>
-              {% else %}
-                <span class="status-pill register-product-stock status-success">Service</span>
-              {% endif %}
-            </div>
-            <div class="register-product-foot mt-auto">
-              <div class="register-product-meta">
-                <div class="register-stock-note">SKU {{ item.product.sku }}</div>
-                {% if item.quantity_in_cart %}<div class="register-stock-note">{{ item.quantity_in_cart }} in cart</div>{% endif %}
-                <div class="register-price mt-2">{{ item.product.sale_price }}</div>
-              </div>
-              <form class="register-product-action" method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="add">
-                <input type="hidden" name="product_id" value="{{ item.product.id }}">
-                <button class="button-primary" type="submit"{% if not item.can_add %} disabled aria-disabled="true"{% endif %}>{% if item.can_add %}Add{% else %}Unavailable{% endif %}</button>
-              </form>
-            </div>
-          </article>
-        {% empty %}
-          <div class="empty-state sm:col-span-2 xl:col-span-3">
-            <div><strong>No products found</strong><p>Try a product name, SKU, barcode, or category.</p></div>
-          </div>
-        {% endfor %}
-      </div>
+      <nav class="register-category-list mt-4" aria-label="Product categories"><a class="register-category-chip{% if not selected_category %} is-active{% endif %}" href="{% url 'sales:register' %}{% if search_form.q.value %}?q={{ search_form.q.value|urlencode }}{% endif %}">All products</a>{% for category in categories %}<a class="register-category-chip{% if selected_category == category.id|stringformat:'s' %} is-active{% endif %}" href="{% url 'sales:register' %}?category={{ category.id }}{% if search_form.q.value %}&amp;q={{ search_form.q.value|urlencode }}{% endif %}">{{ category.name }}</a>{% endfor %}</nav>
+      <div class="register-product-grid">{% for item in products %}{% include "sales/partials/product_card.html" with item=item %}{% empty %}<div class="empty-state sm:col-span-2 xl:col-span-3"><div><strong>No products found</strong><p>Try a SKU, product name, barcode, or another category.</p></div></div>{% endfor %}</div>
+      {% if product_page.has_other_pages %}<nav class="mt-5 flex items-center justify-between gap-3" aria-label="Catalog pages"><span class="app-note text-sm">Page {{ product_page.number }} of {{ product_page.paginator.num_pages }}</span><div class="flex gap-2">{% if product_page.has_previous %}<a class="button-secondary" href="?page={{ product_page.previous_page_number }}{% if selected_category %}&amp;category={{ selected_category }}{% endif %}{% if search_form.q.value %}&amp;q={{ search_form.q.value|urlencode }}{% endif %}">Previous</a>{% endif %}{% if product_page.has_next %}<a class="button-secondary" href="?page={{ product_page.next_page_number }}{% if selected_category %}&amp;category={{ selected_category }}{% endif %}{% if search_form.q.value %}&amp;q={{ search_form.q.value|urlencode }}{% endif %}">Next</a>{% endif %}</div></nav>{% endif %}
     </section>
 
     <aside class="stack register-cart">
-      <section class="page-section">
-        <div class="table-toolbar">
-          <div>
-            <h2>Current sale</h2>
-            <p>Review quantities before taking payment.</p>
-          </div>
-          <span class="chip">{{ cart_lines|length }} line{{ cart_lines|length|pluralize }}</span>
-        </div>
-
-        <div class="register-line-list">
-          {% for line in cart_lines %}
-            <article class="register-line">
-              <div class="register-line-head">
-                <div class="min-w-0">
-                  <strong class="block break-words">{{ line.product.name }}</strong>
-                  <span class="register-line-meta">{{ line.product.sku }}{% if line.stock_quantity is not None %} · {{ line.stock_quantity }} available{% else %} · Non-stock item{% endif %}</span>
-                </div>
-                <form method="post">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="remove-line">
-                  <input type="hidden" name="product_id" value="{{ line.product.id }}">
-                  <button class="button-danger" type="submit">Remove</button>
-                </form>
-              </div>
-              <div class="register-line-foot">
-                <form class="register-quantity" method="post">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="update-line">
-                  <input type="hidden" name="product_id" value="{{ line.product.id }}">
-                  <label class="sr-only" for="quantity-{{ line.product.id }}">Quantity for {{ line.product.name }}</label>
-                  <input class="app-field" id="quantity-{{ line.product.id }}" type="number" name="quantity" min="1"{% if line.stock_quantity is not None %} max="{{ line.stock_quantity }}"{% endif %} value="{{ line.quantity }}">
-                  <button class="button-secondary" type="submit">Update</button>
-                </form>
-                <strong>{{ line.line_total }}</strong>
-              </div>
-            </article>
-          {% empty %}
-            <div class="empty-state"><div><strong>No items in this sale</strong><p>Select an available product to begin.</p></div></div>
-          {% endfor %}
-        </div>
-      </section>
-
-      <section class="page-section">
-        <div class="table-toolbar"><div><h2>Order total</h2><p>Amounts update after discount or tax changes.</p></div></div>
-        <dl class="register-total-list">
-          <div class="register-total-row"><dt>Subtotal</dt><dd>{{ totals.subtotal }}</dd></div>
-          <div class="register-total-row"><dt>Discount</dt><dd>-{{ totals.discount }}</dd></div>
-          <div class="register-total-row"><dt>Tax</dt><dd>{{ totals.tax }}</dd></div>
-          <div class="register-total-row grand-total"><dt>Total due</dt><dd>{{ totals.grand_total }}</dd></div>
-        </dl>
-        <div class="mt-5 grid gap-2 sm:grid-cols-2">
-          <button class="button-secondary" type="button" data-open-modal="pricing-modal">Adjust total</button>
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="clear-cart">
-            <button class="button-secondary w-full" type="submit"{% if not cart_lines %} disabled{% endif %}>Clear sale</button>
-          </form>
-          <button class="button-primary sm:col-span-2" type="button" data-open-modal="checkout-modal"{% if not cart_lines %} disabled aria-disabled="true"{% endif %}>Take payment</button>
-        </div>
-      </section>
+      <section class="page-section"><div class="table-toolbar"><div><div class="section-eyebrow">{{ tenant.name }}</div><h2>Current sale</h2><p>{{ cart_count }} item{{ cart_count|pluralize }} ready for checkout.</p></div><span class="chip">{{ cart_lines|length }} line{{ cart_lines|length|pluralize }}</span></div><div class="register-line-list">{% for line in cart_lines %}{% include "sales/partials/cart_item.html" with line=line %}{% empty %}<div class="empty-state"><div><strong>Your cart is empty</strong><p>Search or select a product to begin a sale.</p></div></div>{% endfor %}</div></section>
+      <section class="page-section"><div class="table-toolbar"><div><h2>Order total</h2><p>Discount and tax use the existing sale calculation.</p></div></div><dl class="register-total-list"><div class="register-total-row"><dt>Subtotal</dt><dd>{{ totals.subtotal }}</dd></div><div class="register-total-row"><dt>Discount</dt><dd>-{{ totals.discount }}</dd></div><div class="register-total-row"><dt>Tax</dt><dd>{{ totals.tax }}</dd></div><div class="register-total-row grand-total"><dt>Total due</dt><dd>{{ totals.grand_total }}</dd></div></dl><div class="mt-5 grid gap-2 sm:grid-cols-2"><button class="button-secondary" type="button" data-open-modal="pricing-modal">Adjust total</button><button class="button-secondary" type="button" data-open-modal="clear-modal"{% if not cart_lines %} disabled{% endif %}>Clear sale</button><button class="button-primary sm:col-span-2" type="button" data-open-modal="checkout-modal"{% if not cart_lines %} disabled aria-disabled="true"{% endif %}>Checkout</button></div></section>
     </aside>
   </section>
 </div>
 
-<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" data-modal="pricing-modal" role="dialog" aria-modal="true" aria-labelledby="pricing-title">
-  <div class="w-full max-w-xl page-section">
-    <div class="table-toolbar"><div><h2 id="pricing-title">Discount and tax</h2><p>Apply fixed amounts to the current sale.</p></div><button class="icon-button" type="button" data-close-modal aria-label="Close discount and tax">&times;</button></div>
-    <form method="post" class="mt-5 grid gap-4 md:grid-cols-2">
-      {% csrf_token %}<input type="hidden" name="action" value="save-pricing">
-      <div class="form-field"><label for="{{ pricing_form.discount.id_for_label }}">Discount</label>{{ pricing_form.discount }}{% for error in pricing_form.discount.errors %}<p class="form-error">{{ error }}</p>{% endfor %}</div>
-      <div class="form-field"><label for="{{ pricing_form.tax.id_for_label }}">Tax</label>{{ pricing_form.tax }}{% for error in pricing_form.tax.errors %}<p class="form-error">{{ error }}</p>{% endfor %}</div>
-      <div class="flex flex-wrap justify-end gap-2 md:col-span-2"><button class="button-secondary" type="button" data-close-modal>Cancel</button><button class="button-primary" type="submit">Update total</button></div>
-    </form>
-  </div>
-</div>
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" data-modal="pricing-modal" role="dialog" aria-modal="true" aria-labelledby="pricing-title"><div class="w-full max-w-xl page-section"><div class="table-toolbar"><div><h2 id="pricing-title">Discount and tax</h2><p>Apply fixed amounts to this sale.</p></div><button class="icon-button" type="button" data-close-modal aria-label="Close discount and tax">&times;</button></div><form method="post" class="mt-5 grid gap-4 md:grid-cols-2" data-submit-lock>{% csrf_token %}<input type="hidden" name="action" value="save-pricing"><div class="form-field"><label for="{{ pricing_form.discount.id_for_label }}">Discount</label>{{ pricing_form.discount }}</div><div class="form-field"><label for="{{ pricing_form.tax.id_for_label }}">Tax</label>{{ pricing_form.tax }}</div><div class="flex justify-end gap-2 md:col-span-2"><button class="button-secondary" type="button" data-close-modal>Cancel</button><button class="button-primary" type="submit">Update total</button></div></form></div></div>
 
-<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" data-modal="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title">
-  <div class="w-full max-w-xl page-section">
-    <div class="table-toolbar"><div><h2 id="checkout-title">Take payment</h2><p>Confirm the method and record the payment reference.</p></div><button class="icon-button" type="button" data-close-modal aria-label="Close payment">&times;</button></div>
-    <form method="post" class="mt-5 grid gap-4 md:grid-cols-2">
-      {% csrf_token %}<input type="hidden" name="action" value="complete-sale">
-      <div class="form-field"><label for="{{ checkout_form.payment_method.id_for_label }}">Payment method</label>{{ checkout_form.payment_method }}{% for error in checkout_form.payment_method.errors %}<p class="form-error">{{ error }}</p>{% endfor %}</div>
-      <div class="form-field"><label for="{{ checkout_form.reference.id_for_label }}">Reference</label>{{ checkout_form.reference }}<p class="form-help">Optional for cash; use the provider or bank reference when available.</p>{% for error in checkout_form.reference.errors %}<p class="form-error">{{ error }}</p>{% endfor %}</div>
-      <div class="register-modal-summary md:col-span-2"><div><div class="section-eyebrow">Total due</div><strong class="text-xl">{{ totals.grand_total }}</strong></div><button class="button-primary" type="submit">Complete sale</button></div>
-    </form>
-  </div>
-</div>
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" data-modal="clear-modal" role="dialog" aria-modal="true" aria-labelledby="clear-title"><div class="w-full max-w-md page-section"><div class="table-toolbar"><div><h2 id="clear-title">Clear this sale?</h2><p>All current cart items and sale adjustments will be removed.</p></div><button class="icon-button" type="button" data-close-modal aria-label="Close clear sale confirmation">&times;</button></div><form class="mt-5 flex justify-end gap-2" method="post" data-submit-lock>{% csrf_token %}<input type="hidden" name="action" value="clear-cart"><button class="button-secondary" type="button" data-close-modal>Keep sale</button><button class="button-danger" type="submit">Clear sale</button></form></div></div>
+
+<div class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 p-4" data-modal="checkout-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title"><div class="w-full max-w-xl page-section"><div class="table-toolbar"><div><h2 id="checkout-title">Confirm payment</h2><p>Payments are recorded in full when the sale completes.</p></div><button class="icon-button" type="button" data-close-modal aria-label="Close checkout">&times;</button></div><form method="post" class="mt-5 grid gap-4 md:grid-cols-2" data-submit-lock>{% csrf_token %}<input type="hidden" name="action" value="complete-sale"><div class="form-field"><label for="{{ checkout_form.payment_method.id_for_label }}">Payment method</label>{{ checkout_form.payment_method }}</div><div class="form-field"><label for="{{ checkout_form.reference.id_for_label }}">Reference</label>{{ checkout_form.reference }}<p class="form-help">Optional for cash; use a reference where available.</p></div><div class="register-modal-summary md:col-span-2"><div><div class="section-eyebrow">{{ cart_count }} item{{ cart_count|pluralize }} · Total due</div><strong class="text-xl">{{ totals.grand_total }}</strong></div><button class="button-primary" type="submit">Confirm and complete sale</button></div></form></div></div>
 
 <script>
   (function () {
     var activeTrigger = null;
-    function showModal(id, trigger) {
-      var modal = document.querySelector('[data-modal="' + id + '"]');
-      if (!modal) return;
-      activeTrigger = trigger || null;
-      modal.classList.remove("hidden");
-      modal.classList.add("flex");
-      var focusTarget = modal.querySelector("select, input, button");
-      if (focusTarget) focusTarget.focus();
-    }
-    function hideModal(modal) {
-      if (!modal) return;
-      modal.classList.add("hidden");
-      modal.classList.remove("flex");
-      if (activeTrigger) activeTrigger.focus();
-      activeTrigger = null;
-    }
-    document.querySelectorAll("[data-open-modal]").forEach(function (button) {
-      button.addEventListener("click", function () { showModal(button.getAttribute("data-open-modal"), button); });
-    });
-    document.querySelectorAll("[data-modal]").forEach(function (modal) {
-      modal.addEventListener("click", function (event) { if (event.target === modal) hideModal(modal); });
-      modal.querySelectorAll("[data-close-modal]").forEach(function (button) { button.addEventListener("click", function () { hideModal(modal); }); });
-    });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") document.querySelectorAll("[data-modal].flex").forEach(hideModal);
-    });
+    function showModal(id, trigger) { var modal = document.querySelector('[data-modal="' + id + '"]'); if (!modal) return; activeTrigger = trigger || null; modal.classList.remove('hidden'); modal.classList.add('flex'); var focusTarget = modal.querySelector('select, input, button'); if (focusTarget) focusTarget.focus(); }
+    function hideModal(modal) { if (!modal) return; modal.classList.add('hidden'); modal.classList.remove('flex'); if (activeTrigger) activeTrigger.focus(); activeTrigger = null; }
+    document.querySelectorAll('[data-open-modal]').forEach(function (button) { button.addEventListener('click', function () { showModal(button.getAttribute('data-open-modal'), button); }); });
+    document.querySelectorAll('[data-modal]').forEach(function (modal) { modal.addEventListener('click', function (event) { if (event.target === modal) hideModal(modal); }); modal.querySelectorAll('[data-close-modal]').forEach(function (button) { button.addEventListener('click', function () { hideModal(modal); }); }); });
+    document.querySelectorAll('[data-submit-lock]').forEach(function (form) { form.addEventListener('submit', function () { var button = form.querySelector('button[type="submit"]'); if (button) { button.disabled = true; button.setAttribute('aria-disabled', 'true'); } }); });
+    var searchForm = document.querySelector('[data-register-search]'); var searchInput = searchForm && searchForm.querySelector('input[name="q"]'); var searchTimer;
+    if (searchInput) { searchInput.addEventListener('input', function () { window.clearTimeout(searchTimer); if (searchInput.value.trim().length > 1) { searchTimer = window.setTimeout(function () { searchForm.submit(); }, 450); } }); }
+    document.addEventListener('keydown', function (event) { if (event.key === 'Escape') document.querySelectorAll('[data-modal].flex').forEach(hideModal); });
   }());
 </script>
 {% endblock %}

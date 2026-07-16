@@ -4,8 +4,11 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
+from config.compat import patch_django_context_copy_for_python_314
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+patch_django_context_copy_for_python_314()
 
 
 def env_bool(name, default=False):
@@ -20,8 +23,18 @@ EMAIL_HOST = os.getenv("DJANGO_EMAIL_HOST", "")
 EMAIL_PORT = int(os.getenv("DJANGO_EMAIL_PORT", "587"))
 EMAIL_HOST_USER = os.getenv("DJANGO_EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("DJANGO_EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("DJANGO_EMAIL_USE_TLS", "1") == "1"
+EMAIL_USE_TLS = env_bool("DJANGO_EMAIL_USE_TLS", True)
+EMAIL_TIMEOUT = int(os.getenv("DJANGO_EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.getenv("DJANGO_DEFAULT_FROM_EMAIL", "POS SaaS <no-reply@pos-saas.local>")
+
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "").strip()
+if SENDGRID_API_KEY:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.getenv("SENDGRID_EMAIL_HOST", "smtp.sendgrid.net")
+    EMAIL_PORT = int(os.getenv("SENDGRID_EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = os.getenv("SENDGRID_EMAIL_HOST_USER", "apikey")
+    EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+    EMAIL_USE_TLS = env_bool("SENDGRID_EMAIL_USE_TLS", True)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -43,6 +56,7 @@ INSTALLED_APPS = [
     "api",
     "dashboard",
     "audit",
+    "platform_admin",
 ]
 
 MIDDLEWARE = [
@@ -104,6 +118,9 @@ AUTH_PASSWORD_VALIDATORS = [] if env_bool("DJANGO_DISABLE_PASSWORD_VALIDATORS", 
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 10}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+AUTHENTICATION_BACKENDS = [
+    "accounts.auth_backends.EmailOrUsernameModelBackend",
 ]
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

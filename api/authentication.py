@@ -35,7 +35,9 @@ class APIKeyAuthentication(BaseAuthentication):
 
         key_hash = sha256(raw_key.encode("utf-8")).hexdigest()
         try:
-            api_key = APIKey.objects.select_related("tenant").get(key_hash=key_hash, is_active=True)
+            api_key = APIKey.objects.select_related("tenant").get(
+                key_hash=key_hash, is_active=True, tenant__is_active=True
+            )
         except APIKey.DoesNotExist as exc:
             raise AuthenticationFailed("Invalid or revoked API key.") from exc
 
@@ -49,4 +51,3 @@ class APIKeyAuthentication(BaseAuthentication):
         if header.startswith(f"{self.keyword} "):
             return header.split(" ", 1)[1].strip()
         return request.headers.get("X-API-Key")
-

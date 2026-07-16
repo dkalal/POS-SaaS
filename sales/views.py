@@ -4,7 +4,8 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.core.paginator import Paginator
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.template.loader import render_to_string
@@ -13,7 +14,7 @@ from django.utils import timezone
 
 from accounts.models import TenantMembership
 from accounts.rbac import tenant_role_required
-from catalog.models import Product
+from catalog.models import Category, Product
 from core.exceptions import DomainError, InsufficientStockError, PaymentMethodNotAllowedError
 from payments.models import Payment
 from sales.forms import RegisterCartAdjustForm, RegisterCheckoutForm, RegisterPricingForm, RegisterSearchForm
@@ -162,7 +163,20 @@ def _register_context(request, tenant, *, search_form=None, pricing_form=None, c
         "grand_total": Decimal("0.00"),
     }
     q = (search_form.cleaned_data["q"] if search_form and search_form.is_valid() else (request.GET.get("q") or "")).strip()
+    categories = Category.objects.filter(
+        tenant=tenant,
+        is_active=True,
+        products__tenant=tenant,
+        products__is_active=True,
+    ).distinct().order_by("sort_order", "name")
+    selected_category = request.GET.get("category", "").strip()
+    category_ids = {str(category.pk) for category in categories}
+    if selected_category not in category_ids:
+        selected_category = ""
+
     products = Product.objects.select_related("category", "stock").filter(tenant=tenant, is_active=True)
+    if selected_category:
+        products = products.filter(category_id=selected_category)
     if q:
         products = products.filter(
             (
@@ -171,10 +185,27 @@ def _register_context(request, tenant, *, search_form=None, pricing_form=None, c
                 | Q(barcode__icontains=q)
                 | Q(category__name__icontains=q)
             )
-        )
+        ).annotate(
+            search_priority=Case(
+                When(sku__iexact=q, then=Value(0)),
+                When(sku__istartswith=q, then=Value(1)),
+                When(sku__icontains=q, then=Value(2)),
+                When(name__iexact=q, then=Value(3)),
+                When(name__istartswith=q, then=Value(4)),
+                When(name__icontains=q, then=Value(5)),
+                When(barcode__iexact=q, then=Value(6)),
+                When(barcode__istartswith=q, then=Value(7)),
+                When(barcode__icontains=q, then=Value(8)),
+                default=Value(9),
+                output_field=IntegerField(),
+            )
+        ).order_by("search_priority", "name", "sku", "pk")
+    else:
+        products = products.order_by("name", "sku", "pk")
     cart_quantities = {line["product_id"]: line["quantity"] for line in cart}
     product_cards = []
-    for product in products.order_by("name", "sku")[:24]:
+    product_page = Paginator(products, 24).get_page(request.GET.get("page"))
+    for product in product_page:
         stock_quantity = _product_stock_quantity(product)
         product_cards.append(
             {
@@ -191,12 +222,15 @@ def _register_context(request, tenant, *, search_form=None, pricing_form=None, c
         "pricing_form": pricing_form or RegisterPricingForm(initial={"discount": meta["discount"], "tax": meta["tax"]}),
         "checkout_form": checkout_form or RegisterCheckoutForm(initial={"payment_method": meta["payment_method"], "reference": meta["reference"]}),
         "products": product_cards,
+        "product_page": product_page,
+        "categories": categories,
+        "selected_category": selected_category,
         "cart_lines": cart_lines,
         "cart_count": sum(line["quantity"] for line in cart_lines),
         "totals": totals,
         "current_payment_method": meta["payment_method"],
         "current_reference": meta["reference"],
-        "can_open_register": True,
+        "register_workspace": True,
     }
 
 

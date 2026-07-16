@@ -19,6 +19,12 @@ class AuditEvent(TenantScopedModel):
         STOCK_ADJUSTMENT_CANCELLED = "stock_adjustment_cancelled", "Stock adjustment cancelled"
         ROLE_ASSIGNED = "role_assigned", "Role assigned"
         ROLE_UPDATED = "role_updated", "Role updated"
+        INVITATION_CREATED = "invitation_created", "Invitation created"
+        INVITATION_ACCEPTED = "invitation_accepted", "Invitation accepted"
+        INVITATION_REVOKED = "invitation_revoked", "Invitation revoked"
+        MEMBER_SUSPENDED = "member_suspended", "Member suspended"
+        MEMBER_REMOVED = "member_removed", "Member removed"
+        WORKSPACE_SWITCHED = "workspace_switched", "Workspace switched"
 
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="audit_events")
     action = models.CharField(max_length=64, choices=Action.choices)

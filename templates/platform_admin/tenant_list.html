@@ -1,0 +1,59 @@
+{% extends "platform_admin/base.html" %}
+
+{% block platform_title %}Tenant management{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <section class="page-section">
+    <div class="table-toolbar">
+      <div>
+        <h2>Tenant management</h2>
+        <p>Review customer workspaces, subscription state, and active access.</p>
+      </div>
+      <a class="button-primary" href="{% url 'platform_admin:tenant-create' %}">Create tenant</a>
+    </div>
+
+    <div class="responsive-table-wrap">
+      <table>
+        <thead class="tabular-head">
+          <tr>
+            <th class="text-left">Business</th>
+            <th class="text-left">Plan</th>
+            <th class="text-left">Status</th>
+            <th class="text-left">Active users</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="tabular-body">
+          {% for tenant in tenants %}
+            <tr>
+              <td>
+                <strong>{{ tenant.name }}</strong>
+                <small class="block app-note">{{ tenant.slug }}</small>
+              </td>
+              <td>{{ tenant.subscription_plan|default:"No plan" }}</td>
+              <td>
+                <span class="status-pill {% if tenant.status == 'active' %}status-success{% elif tenant.status == 'trial' %}status-warning{% else %}status-danger{% endif %}">
+                  {{ tenant.get_status_display }}
+                </span>
+              </td>
+              <td>{{ tenant.active_users }}</td>
+              <td>
+                <div class="flex justify-end">
+                  <a class="button-secondary" href="{% url 'platform_admin:tenant-detail' tenant.pk %}">Manage</a>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">
+                {% include "components/empty_state.html" with title="No tenants yet" message="Create the first customer workspace when onboarding begins." %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

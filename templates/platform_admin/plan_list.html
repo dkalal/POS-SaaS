@@ -1,0 +1,59 @@
+{% extends "platform_admin/base.html" %}
+
+{% block platform_title %}Subscription plans{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <section class="page-section">
+    <div class="table-toolbar">
+      <div>
+        <h2>Subscription plans</h2>
+        <p>Create, edit, or disable the commercial plans available to tenants.</p>
+      </div>
+      <a class="button-primary" href="{% url 'platform_admin:plan-create' %}">Create plan</a>
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {% for plan in plans %}
+        <article class="card-soft p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="m-0 text-base font-bold">{{ plan.name }}</h3>
+              <p class="app-note mt-1 text-sm">{{ plan.code }}</p>
+            </div>
+            <span class="status-pill {% if plan.is_active %}status-success{% else %}status-danger{% endif %}">
+              {% if plan.is_active %}Active{% else %}Disabled{% endif %}
+            </span>
+          </div>
+
+          <dl class="mt-4 grid gap-3 text-sm">
+            <div class="flex justify-between gap-3">
+              <dt class="app-note">Monthly</dt>
+              <dd class="font-bold">TZS {{ plan.monthly_price }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="app-note">Annual</dt>
+              <dd class="font-bold">TZS {{ plan.annual_price }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="app-note">Users</dt>
+              <dd class="font-bold">{{ plan.max_users }}</dd>
+            </div>
+            <div class="flex justify-between gap-3">
+              <dt class="app-note">Trial</dt>
+              <dd class="font-bold">{{ plan.trial_days }} days</dd>
+            </div>
+          </dl>
+
+          <div class="mt-4 flex items-center justify-between gap-3">
+            <span class="app-note text-xs">{{ plan.subscription_count }} historical subscriptions</span>
+            <a class="button-secondary" href="{% url 'platform_admin:plan-edit' plan.pk %}">Edit</a>
+          </div>
+        </article>
+      {% empty %}
+        {% include "components/empty_state.html" with title="No plans yet" message="Create a plan before creating a tenant." %}
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

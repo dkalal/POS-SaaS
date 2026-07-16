@@ -236,7 +236,7 @@ class SalesRegisterViewTests(TransactionTestCase):
     def test_register_page_renders_for_cashier(self):
         response = self.client.get(reverse("sales:register"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Product catalog")
+        self.assertContains(response, "Find products")
         self.assertContains(response, "USB Adapter")
 
     def test_register_adds_item_and_completes_sale(self):
@@ -275,3 +275,75 @@ class SalesRegisterViewTests(TransactionTestCase):
         response = self.client.post(reverse("sales:register"), {"action": "add", "product_id": self.product.id}, follow=True)
 
         self.assertContains(response, "has no more stock available to add")
+
+    def test_register_search_prioritizes_exact_sku_then_name_then_barcode(self):
+        name_match = Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="MATCH",
+            sku="NAME-MATCH",
+            sale_price=Decimal("5.00"),
+            is_active=True,
+        )
+        barcode_match = Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="Barcode result",
+            sku="BAR-MATCH",
+            barcode="MATCH",
+            sale_price=Decimal("6.00"),
+            is_active=True,
+        )
+        sku_match = Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="SKU result",
+            sku="MATCH",
+            sale_price=Decimal("7.00"),
+            is_active=True,
+        )
+
+        response = self.client.get(reverse("sales:register"), {"q": "MATCH"})
+        content = response.content.decode()
+        content = content[content.index('class="register-product-grid"'):]
+
+        self.assertLess(content.index(sku_match.name), content.index(name_match.name))
+        self.assertLess(content.index(name_match.name), content.index(barcode_match.name))
+
+    def test_register_category_filter_stays_tenant_scoped(self):
+        other_category = Category.objects.create(
+            tenant=self.tenant,
+            name="Services",
+            slug="services",
+            is_active=True,
+        )
+        Product.objects.create(
+            tenant=self.tenant,
+            category=other_category,
+            name="Installation",
+            sku="INSTALL-1",
+            sale_price=Decimal("12.00"),
+            track_inventory=False,
+            is_active=True,
+        )
+        other_tenant = Tenant.objects.create(name="Tenant D", slug="tenant-d")
+        foreign_category = Category.objects.create(
+            tenant=other_tenant,
+            name="Foreign",
+            slug="foreign",
+            is_active=True,
+        )
+        foreign_product = Product.objects.create(
+            tenant=other_tenant,
+            category=foreign_category,
+            name="Foreign product",
+            sku="FOREIGN-1",
+            sale_price=Decimal("20.00"),
+            is_active=True,
+        )
+
+        response = self.client.get(reverse("sales:register"), {"category": other_category.id})
+
+        self.assertContains(response, "Installation")
+        self.assertNotContains(response, self.product.name)
+        self.assertNotContains(response, foreign_product.name)

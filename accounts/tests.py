@@ -37,6 +37,27 @@ class AuthFlowTests(TestCase):
         self.assertEqual(response.url, reverse("dashboard"))
         self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.id)
 
+    def test_login_accepts_username_and_case_insensitive_email(self):
+        for identifier in ("owner", "OWNER@example.com"):
+            self.client.post(reverse("logout")) if self.client.session.get("_auth_user_id") else None
+            response = self.client.post(
+                reverse("login"),
+                data={"username": identifier, "password": "pass12345"},
+            )
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(int(self.client.session["_auth_user_id"]), self.user.id)
+
+    def test_login_fails_closed_for_ambiguous_email_identity(self):
+        User.objects.create_user(username="second-owner", email=self.user.email, password="pass12345")
+
+        response = self.client.post(
+            reverse("login"),
+            data={"username": self.user.email, "password": "pass12345"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "The credentials did not match an active account.")
+
     def test_login_page_shows_security_focused_form(self):
         response = self.client.get(reverse("login"))
 
@@ -95,7 +116,8 @@ class TenantInvitationTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn("You're invited to join Tenant A", mail.outbox[0].subject)
         self.assertEqual(mail.outbox[0].to, ["manager@example.com"])
-        self.assertIn(invitation.token, mail.outbox[0].body)
+        self.assertIn("/accounts/invitations/", mail.outbox[0].body)
+        self.assertNotIn(invitation.token_hash, mail.outbox[0].body)
 
     def test_invited_user_can_accept_invitation(self):
         invitation = TenantInvitation.objects.create(
@@ -123,3 +145,121 @@ class TenantInvitationTests(TestCase):
         invitation.refresh_from_db()
         self.assertFalse(invitation.is_active)
         self.assertIsNotNone(invitation.accepted_at)
+
+    def test_existing_member_can_accept_invitation_for_another_tenant(self):
+        other_tenant = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        TenantMembership.objects.create(
+            tenant=other_tenant,
+            user=self.invitee,
+            role=TenantMembership.Role.CASHIER,
+            is_active=True,
+        )
+        invitation = TenantInvitation.objects.create(
+            tenant=self.tenant,
+            email=self.invitee.email,
+            role=TenantInvitation.Role.MANAGER,
+            token="multi-tenant-invite-token",
+            invited_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        self.client.force_login(self.invitee)
+
+        response = self.client.post(reverse("accept_tenant_invitation", args=[invitation.token]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(TenantMembership.objects.filter(tenant=self.tenant, user=self.invitee, is_active=True).exists())
+        self.assertTrue(TenantMembership.objects.filter(tenant=other_tenant, user=self.invitee, is_active=True).exists())
+
+    def test_invited_person_without_an_account_can_create_password_and_join(self):
+        invitation = TenantInvitation.objects.create(
+            tenant=self.tenant,
+            email="new.cashier@example.com",
+            role=TenantInvitation.Role.CASHIER,
+            token="new-account-invite-token",
+            invited_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+        landing = self.client.get(reverse("accept_tenant_invitation", args=[invitation.token]))
+        self.assertEqual(landing.status_code, 200)
+        self.assertContains(landing, "Create my account")
+        self.assertContains(landing, "I already have an account")
+
+        response = self.client.post(
+            reverse("create_invitation_account", args=[invitation.token]),
+            data={"password1": "secure-new-password", "password2": "secure-new-password"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        user = User.objects.get(email="new.cashier@example.com")
+        self.assertTrue(user.check_password("secure-new-password"))
+        self.assertEqual(int(self.client.session["_auth_user_id"]), user.id)
+        self.assertEqual(self.client.session["current_tenant_id"], self.tenant.id)
+        self.assertTrue(TenantMembership.objects.filter(tenant=self.tenant, user=user, role=TenantMembership.Role.CASHIER).exists())
+        invitation.refresh_from_db()
+        self.assertEqual(invitation.accepted_by, user)
+        self.assertFalse(invitation.is_active)
+
+    def test_existing_account_is_directed_to_sign_in_with_invited_email(self):
+        invitation = TenantInvitation.objects.create(
+            tenant=self.tenant,
+            email=self.invitee.email,
+            role=TenantInvitation.Role.MANAGER,
+            token="existing-account-invite-token",
+            invited_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+        response = self.client.get(reverse("accept_tenant_invitation", args=[invitation.token]))
+
+        self.assertContains(response, "I already have an account")
+        self.assertContains(response, "email=manager%40example.com")
+        self.assertNotContains(response, "Create my account")
+
+    def test_invitation_account_creation_rejects_mismatched_passwords(self):
+        invitation = TenantInvitation.objects.create(
+            tenant=self.tenant,
+            email="new.manager@example.com",
+            role=TenantInvitation.Role.MANAGER,
+            token="password-mismatch-invite-token",
+            invited_by=self.owner,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+
+        response = self.client.post(
+            reverse("create_invitation_account", args=[invitation.token]),
+            data={"password1": "secure-new-password", "password2": "different-password"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "The passwords do not match.", status_code=400)
+        self.assertFalse(User.objects.filter(email="new.manager@example.com").exists())
+
+    def test_duplicate_active_invitation_is_rejected(self):
+        TenantInvitation.objects.create(
+            tenant=self.tenant, email="new@example.com", role=TenantInvitation.Role.MANAGER,
+            token="already-pending", invited_by=self.owner, expires_at=timezone.now() + timedelta(days=7),
+        )
+        from accounts.services import create_tenant_invitation
+        with self.assertRaises(ValueError):
+            create_tenant_invitation(tenant=self.tenant, email="NEW@example.com", role=TenantInvitation.Role.MANAGER, invited_by=self.owner)
+
+    def test_suspended_membership_cannot_access_workspace(self):
+        TenantMembership.objects.create(tenant=self.tenant, user=self.invitee, role=TenantMembership.Role.MANAGER, status=TenantMembership.Status.SUSPENDED)
+        self.client.force_login(self.invitee)
+        session = self.client.session
+        session["current_tenant_id"] = self.tenant.id
+        session.save()
+        response = self.client.get(reverse("dashboard"))
+        self.assertIsNone(getattr(response.wsgi_request, "tenant", None))
+        self.assertNotIn("current_tenant_id", self.client.session)
+
+    def test_workspace_switch_is_limited_to_active_memberships(self):
+        other = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        TenantMembership.objects.create(tenant=other, user=self.invitee, role=TenantMembership.Role.CASHIER)
+        self.client.force_login(self.invitee)
+        response = self.client.post(reverse("switch_workspace", args=[other.id]))
+        self.assertRedirects(response, reverse("dashboard"))
+        self.assertEqual(self.client.session["current_tenant_id"], other.id)
+        response = self.client.post(reverse("switch_workspace", args=[self.tenant.id]))
+        self.assertEqual(response.status_code, 403)

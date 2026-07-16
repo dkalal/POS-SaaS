@@ -1,0 +1,143 @@
+{% extends "platform_admin/base.html" %}
+
+{% block platform_title %}{{ tenant.name }}{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <section class="page-section">
+    <div class="table-toolbar">
+      <div>
+        <h2>{{ tenant.name }}</h2>
+        <p>{{ tenant.slug }} &middot; {{ tenant.country }} &middot; {{ tenant.currency }}</p>
+      </div>
+      <span class="status-pill {% if tenant.status == 'active' %}status-success{% elif tenant.status == 'trial' %}status-warning{% else %}status-danger{% endif %}">
+        {{ tenant.get_status_display }}
+      </span>
+    </div>
+
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div class="card-soft p-3">
+        <span class="stat-label">Contact</span>
+        <strong class="mt-2 block">{{ tenant.contact_name|default:"Not provided" }}</strong>
+        <span class="app-note mt-1 block text-sm">{{ tenant.contact_email|default:"No email" }}</span>
+      </div>
+      <div class="card-soft p-3">
+        <span class="stat-label">Phone</span>
+        <strong class="mt-2 block">{{ tenant.contact_phone|default:"Not provided" }}</strong>
+      </div>
+      <div class="card-soft p-3">
+        <span class="stat-label">Plan</span>
+        <strong class="mt-2 block">{{ tenant.subscription_plan|default:"No plan" }}</strong>
+      </div>
+      <div class="card-soft p-3">
+        <span class="stat-label">Trial ends</span>
+        <strong class="mt-2 block">{{ tenant.trial_ends_at|default:"Not set" }}</strong>
+      </div>
+    </div>
+
+    <div class="mt-4 flex flex-wrap gap-2">
+      {% if tenant.status != 'active' %}
+        <form method="post" action="{% url 'platform_admin:tenant-status' tenant.pk %}">
+          {% csrf_token %}
+          <input name="status" value="active" type="hidden">
+          <button class="button-primary" type="submit" onclick="return confirm('Reactivate this workspace?')">Activate</button>
+        </form>
+      {% endif %}
+      {% if tenant.status != 'suspended' %}
+        <form method="post" action="{% url 'platform_admin:tenant-status' tenant.pk %}">
+          {% csrf_token %}
+          <input name="status" value="suspended" type="hidden">
+          <button class="button-secondary" type="submit" onclick="return confirm('Suspend workspace access without deleting data?')">Suspend</button>
+        </form>
+      {% endif %}
+      <form method="post" action="{% url 'platform_admin:tenant-status' tenant.pk %}">
+        {% csrf_token %}
+        <input name="status" value="cancelled" type="hidden">
+        <button class="button-danger" type="submit" onclick="return confirm('Cancel this tenant? Historical data remains preserved.')">Cancel</button>
+      </form>
+      <a class="button-secondary" href="{% url 'platform_admin:tenant-list' %}">Back to tenants</a>
+    </div>
+  </section>
+
+  <section class="content-grid split">
+    <div class="stack">
+      <section class="page-section">
+        <div class="table-toolbar">
+          <div><h2>Team users</h2><p>High-level workspace membership.</p></div>
+          <span class="chip">{{ memberships|length }} users</span>
+        </div>
+        <div class="responsive-table-wrap">
+          <table>
+            <thead class="tabular-head"><tr><th class="text-left">User</th><th class="text-left">Role</th><th class="text-left">Status</th></tr></thead>
+            <tbody class="tabular-body">
+              {% for membership in memberships %}
+                <tr>
+                  <td><strong>{{ membership.user.get_username }}</strong></td>
+                  <td>{{ membership.get_role_display }}</td>
+                  <td>{% if membership.is_active %}<span class="status-pill status-success">Active</span>{% else %}<span class="status-pill status-danger">Inactive</span>{% endif %}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3">{% include "components/empty_state.html" with title="No team members yet" message="Creating a tenant does not create an owner account automatically." %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="page-section">
+        <div class="table-toolbar">
+          <div><h2>Subscription history</h2><p>Historical subscription records are preserved.</p></div>
+        </div>
+        <div class="grid gap-3">
+          {% for subscription in subscriptions %}
+            <div class="card-soft p-3 text-sm">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <strong>{{ subscription.plan }}</strong>
+                <span class="status-pill {% if subscription.status == 'active' or subscription.status == 'trialing' %}status-success{% elif subscription.status == 'cancelled' %}status-danger{% else %}status-warning{% endif %}">{{ subscription.get_status_display }}</span>
+              </div>
+              <span class="app-note mt-1 block">{{ subscription.started_at }}{% if subscription.cancelled_at %} &middot; ended {{ subscription.cancelled_at }}{% endif %}</span>
+            </div>
+          {% empty %}
+            {% include "components/empty_state.html" with title="No subscription history" message="Assign a plan to begin recording subscription lifecycle changes." %}
+          {% endfor %}
+        </div>
+      </section>
+    </div>
+
+    <aside class="stack">
+      <section class="page-section">
+        <div class="table-toolbar"><div><h2>Change plan</h2><p>Updates the active subscription while retaining history.</p></div></div>
+        <form method="post" action="{% url 'platform_admin:tenant-plan-change' tenant.pk %}" class="grid gap-4">
+          {% csrf_token %}
+          {% include "components/form_field.html" with field=plan_form.plan %}
+          {% include "components/form_field.html" with field=plan_form.billing_cycle %}
+          <button class="button-primary justify-self-start" type="submit">Update plan</button>
+        </form>
+      </section>
+
+      <section class="page-section">
+        <div class="table-toolbar"><div><h2>Extend trial</h2><p>Restores explicit trial access for a controlled number of days.</p></div></div>
+        <form method="post" action="{% url 'platform_admin:tenant-trial-extend' tenant.pk %}" class="grid gap-4">
+          {% csrf_token %}
+          {% include "components/form_field.html" with field=trial_form.days %}
+          <button class="button-secondary justify-self-start" type="submit">Extend trial</button>
+        </form>
+      </section>
+
+      <section class="page-section">
+        <div class="table-toolbar"><div><h2>Audit trail</h2><p>Dangerous platform actions are recorded here.</p></div></div>
+        <div class="grid gap-3">
+          {% for event in audit_events %}
+            <div class="card-soft p-3 text-sm">
+              <strong>{{ event.get_action_display }}</strong>
+              <span class="app-note mt-1 block">{{ event.actor }} &middot; {{ event.created_at }}</span>
+            </div>
+          {% empty %}
+            {% include "components/empty_state.html" with title="No operator actions" message="Status, trial, and plan changes will appear after they are performed." %}
+          {% endfor %}
+        </div>
+      </section>
+    </aside>
+  </section>
+</div>
+{% endblock %}

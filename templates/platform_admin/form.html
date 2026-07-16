@@ -1,0 +1,37 @@
+{% extends "platform_admin/base.html" %}
+
+{% block platform_title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <section class="page-section">
+    <div class="table-toolbar">
+      <div>
+        <h2>{{ title }}</h2>
+        <p>{% if "tenant" in submit_label|lower %}Create a customer workspace without mixing it with platform administration.{% else %}Plans control SaaS limits and trial defaults for customer workspaces.{% endif %}</p>
+      </div>
+      <a class="button-secondary" href="{% if 'tenant' in submit_label|lower %}{% url 'platform_admin:tenant-list' %}{% else %}{% url 'platform_admin:plan-list' %}{% endif %}">Cancel</a>
+    </div>
+
+    <form method="post" class="grid gap-4">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="message-error">{{ form.non_field_errors }}</div>
+      {% endif %}
+
+      <div class="grid gap-4 md:grid-cols-2">
+        {% for field in form %}
+          <div {% if field.field.widget.input_type == "checkbox" or field.name == "address" or field.name == "feature_limits" %}class="md:col-span-2"{% endif %}>
+            {% include "components/form_field.html" with field=field %}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <button class="button-primary" type="submit">{{ submit_label }}</button>
+        <a class="button-secondary" href="{% if 'tenant' in submit_label|lower %}{% url 'platform_admin:tenant-list' %}{% else %}{% url 'platform_admin:plan-list' %}{% endif %}">Back</a>
+      </div>
+    </form>
+  </section>
+</div>
+{% endblock %}

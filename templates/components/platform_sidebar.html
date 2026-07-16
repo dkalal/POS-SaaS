@@ -1,0 +1,42 @@
+{% with url_name=request.resolver_match.url_name %}
+<aside class="admin-sidebar" data-sidebar>
+  <div class="sidebar-head">
+    <a class="brand-lockup" href="{% url 'platform_admin:dashboard' %}">
+      <span class="brand-mark">P</span>
+      <span class="brand-copy">
+        <span class="brand-title">POS SaaS</span>
+        <span class="brand-subtitle">Platform Administration</span>
+      </span>
+    </a>
+  </div>
+
+  <nav class="sidebar-nav" aria-label="Platform navigation">
+    <div class="nav-group">
+      <div class="nav-label">Platform</div>
+      <a class="nav-item {% if url_name == 'dashboard' %}is-active{% endif %}" href="{% url 'platform_admin:dashboard' %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></svg>
+        <span>Overview</span>
+      </a>
+      <a class="nav-item {% if url_name == 'tenant-list' or url_name == 'tenant-create' or url_name == 'tenant-detail' %}is-active{% endif %}" href="{% url 'platform_admin:tenant-list' %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Tenants</span>
+      </a>
+      <a class="nav-item {% if url_name == 'plan-list' or url_name == 'plan-create' or url_name == 'plan-edit' %}is-active{% endif %}" href="{% url 'platform_admin:plan-list' %}">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7H14.5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span>Subscription plans</span>
+      </a>
+    </div>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="tenant-card-mini">
+      <span>Access scope</span>
+      <strong>Platform operator</strong>
+    </div>
+    <button class="nav-item sidebar-collapse" type="button" data-sidebar-collapse aria-label="Collapse navigation" aria-pressed="false">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>
+      <span class="sidebar-collapse-label">Collapse</span>
+    </button>
+  </div>
+</aside>
+{% endwith %}

@@ -176,6 +176,12 @@
     .content-grid { display: grid; gap: 1rem; }
     .content-grid.split { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.9fr); align-items: start; }
     .register-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(21rem, 0.56fr); gap: 1rem; align-items: start; }
+    .register-workspace { min-height: 100vh; }
+    .register-workspace-main { width: 100%; max-width: none; padding: 1rem 1.25rem 1.5rem; }
+    .register-workspace-header { min-height: 4.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.7rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--panel); }
+    .register-category-list { display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.15rem 0 0.35rem; scrollbar-width: thin; }
+    .register-category-chip { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 2.2rem; padding: 0.35rem 0.75rem; border: 1px solid var(--border); border-radius: 999px; background: var(--panel); color: var(--soft); font-size: 0.82rem; font-weight: 750; }
+    .register-category-chip:hover, .register-category-chip.is-active { border-color: color-mix(in srgb, var(--primary) 35%, var(--border)); background: var(--primary-soft); color: var(--primary-strong); }
     .register-catalog, .register-cart { min-width: 0; }
     .register-cart { position: sticky; top: 5.25rem; }
     .register-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; width: min(100%, 38rem); }
@@ -336,6 +342,7 @@
       .admin-topbar { padding: 0.65rem 0.85rem; }
       .register-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .register-search { width: 100%; }
+      .register-workspace-header, .register-workspace-main { padding-left: 0.85rem; padding-right: 0.85rem; }
     }
     @media (max-width: 520px) {
       .register-product-grid { grid-template-columns: 1fr; }
@@ -347,13 +354,22 @@
   </style>
 </head>
 <body>
-  {% if request.user.is_authenticated %}
+  {% if request.user.is_authenticated and not register_workspace %}
     <div class="admin-layout">
-      {% include "components/sidebar.html" %}
+      {% if platform_mode %}
+        {% include "components/platform_sidebar.html" %}
+      {% else %}
+        {% include "components/sidebar.html" %}
+      {% endif %}
       <div class="admin-content">
-        {% include "components/topbar.html" %}
+        {% if platform_mode %}
+          {% include "components/platform_topbar.html" %}
+        {% else %}
+          {% include "components/topbar.html" %}
+        {% endif %}
   {% endif %}
-  <main class="main-region" id="main-content">
+  {% if register_workspace %}{% include "sales/partials/register_header.html" %}{% endif %}
+  <main class="{% if register_workspace %}register-workspace-main{% else %}main-region{% endif %}" id="main-content">
     {% if messages %}
       <div class="messages" aria-live="polite">
         {% for message in messages %}
@@ -365,7 +381,7 @@
     {% endif %}
     {% block content %}{% endblock %}
   </main>
-  {% if request.user.is_authenticated %}
+  {% if request.user.is_authenticated and not register_workspace %}
       </div>
     </div>
     <button class="sidebar-backdrop" type="button" data-sidebar-close aria-label="Close navigation"></button>

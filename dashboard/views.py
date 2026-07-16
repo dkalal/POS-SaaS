@@ -300,18 +300,23 @@ def _render_dashboard_body(context, csrf_token):
 
 @login_required
 def dashboard(request):
+    # Platform operators never receive an implicit customer workspace.
+    if request.user.is_superuser and not TenantMembership.objects.filter(user=request.user).exists():
+        return redirect("platform_admin:dashboard")
     if not Tenant.objects.filter(is_active=True).exists():
         return redirect("bootstrap")
 
     tenant = getattr(request, "tenant", None)
     memberships = (
         TenantMembership.objects.select_related("tenant")
-        .filter(user=request.user, is_active=True)
+        .filter(user=request.user, status=TenantMembership.Status.ACTIVE, is_active=True)
         .order_by("tenant__name")
     )
     current_membership = None
     if tenant is not None:
         current_membership = memberships.filter(tenant=tenant).first()
+    owner_roles = (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN)
+    manager_roles = owner_roles + (TenantMembership.Role.MANAGER,)
 
     context = {
         "current_tenant": (
@@ -327,26 +332,26 @@ def dashboard(request):
         ],
         "has_tenant": tenant is not None,
         "can_manage_members": request.user.is_superuser
-        or (current_membership is not None and current_membership.role == TenantMembership.Role.OWNER_ADMIN),
+        or (current_membership is not None and current_membership.role in owner_roles),
         "can_manage_api_keys": request.user.is_superuser
-        or (current_membership is not None and current_membership.role == TenantMembership.Role.OWNER_ADMIN),
+        or (current_membership is not None and current_membership.role in owner_roles),
         "can_manage_catalog": request.user.is_superuser
         or (
             current_membership is not None
             and current_membership.role
-            in (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.MANAGER)
+            in manager_roles
         ),
         "can_manage_purchases": request.user.is_superuser
         or (
             current_membership is not None
             and current_membership.role
-            in (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.MANAGER)
+            in manager_roles
         ),
         "can_manage_inventory": request.user.is_superuser
         or (
             current_membership is not None
             and current_membership.role
-            in (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.MANAGER)
+            in manager_roles
         ),
         "can_view_audit": request.user.is_superuser
         or (current_membership is not None and current_membership.role == TenantMembership.Role.OWNER_ADMIN),

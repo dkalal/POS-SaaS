@@ -1,0 +1,42 @@
+{% extends "platform_admin/base.html" %}
+
+{% block platform_title %}Platform overview{% endblock %}
+
+{% block content %}
+<div class="stack">
+  <section class="page-section">
+    <div class="table-toolbar">
+      <div>
+        <h2>Platform health</h2>
+        <p>Customer workspaces, access state, and platform activity.</p>
+      </div>
+      <a class="button-primary" href="{% url 'platform_admin:tenant-create' %}">Create tenant</a>
+    </div>
+    <div class="stat-grid">
+      <article class="stat-card"><span class="stat-label">Total tenants</span><strong class="stat-card-value">{{ stats.total_tenants }}</strong><span class="stat-card-hint">Customer workspaces</span></article>
+      <article class="stat-card"><span class="stat-label">Active tenants</span><strong class="stat-card-value">{{ stats.active_tenants }}</strong><span class="stat-card-hint">Live workspaces</span></article>
+      <article class="stat-card"><span class="stat-label">Trials expiring</span><strong class="stat-card-value">{{ stats.trials_expiring }}</strong><span class="stat-card-hint">Within 7 days</span></article>
+      <article class="stat-card"><span class="stat-label">Suspended tenants</span><strong class="stat-card-value">{{ stats.suspended_tenants }}</strong><span class="stat-card-hint">Access paused</span></article>
+      <article class="stat-card"><span class="stat-label">Active users</span><strong class="stat-card-value">{{ stats.active_users }}</strong><span class="stat-card-hint">Across active workspaces</span></article>
+    </div>
+  </section>
+
+  <div class="content-grid split">
+    <section class="page-section">
+      <div class="table-toolbar"><div><h2>Recent tenants</h2><p>Latest customer workspaces.</p></div><a class="button-secondary" href="{% url 'platform_admin:tenant-list' %}">View tenants</a></div>
+      <div class="responsive-table-wrap">
+        <table><thead class="tabular-head"><tr><th>Business</th><th>Plan</th><th>Status</th></tr></thead><tbody class="tabular-body">
+          {% for tenant in recent_tenants %}<tr><td><a href="{% url 'platform_admin:tenant-detail' tenant.pk %}"><strong>{{ tenant.name }}</strong><span class="block app-note text-xs">{{ tenant.slug }}</span></a></td><td>{{ tenant.subscription_plan|default:"No plan" }}</td><td><span class="status-pill {% if tenant.status == 'active' %}status-success{% elif tenant.status == 'trial' %}status-warning{% else %}status-danger{% endif %}">{{ tenant.get_status_display }}</span></td></tr>{% empty %}<tr><td colspan="3" class="app-note">No tenants yet. Create the first customer workspace.</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </section>
+
+    <section class="page-section">
+      <div class="table-toolbar"><div><h2>Operator activity</h2><p>Audited platform actions.</p></div></div>
+      <div class="stack">
+        {% for event in recent_audit %}<div class="card-soft p-3 text-sm"><strong>{{ event.get_action_display }}</strong><span class="app-note"> &middot; {{ event.target_tenant|default:"Platform" }}</span><small class="mt-1 block app-note">{{ event.actor }} &middot; {{ event.created_at }}</small></div>{% empty %}<div class="empty-state"><div><strong>No activity yet</strong><p>Tenant and plan changes will be recorded here.</p></div></div>{% endfor %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
