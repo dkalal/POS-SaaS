@@ -10,7 +10,7 @@ from django.test import TestCase, TransactionTestCase
 from django.urls import reverse
 
 from catalog.models import Category, Product
-from core.exceptions import InsufficientStockError, PurchaseAlreadyReceivedError
+from core.exceptions import InvalidPurchaseInputError, InsufficientStockError, PurchaseAlreadyReceivedError
 from accounts.models import TenantMembership
 from inventory.models import Stock, StockMovement
 from purchasing.models import Purchase, PurchaseItem
@@ -185,6 +185,40 @@ class PurchasingServiceTests(TransactionTestCase):
         self.assertEqual(purchase.status, Purchase.Status.DRAFT)
         self.assertFalse(Stock.objects.filter(tenant=self.tenant, product=self.product).exists())
         self.assertEqual(StockMovement.objects.count(), 0)
+
+    def test_service_item_cannot_be_added_or_received_as_stock(self):
+        service = Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="Installation service",
+            sku="INSTALL-001",
+            sale_price=Decimal("20.00"),
+            is_active=True,
+            track_inventory=False,
+        )
+
+        with self.assertRaises(InvalidPurchaseInputError):
+            create_draft_purchase(
+                tenant=self.tenant,
+                supplier=self.supplier,
+                items=[{"product": service, "quantity": 1, "unit_cost": Decimal("10.00")}],
+                created_by=self.user,
+            )
+
+        self.assertFalse(Purchase.objects.filter(tenant=self.tenant).exists())
+        self.assertFalse(StockMovement.objects.filter(tenant=self.tenant).exists())
+
+    def test_archived_supplier_cannot_be_used_for_new_purchase(self):
+        self.supplier.is_active = False
+        self.supplier.save(update_fields=["is_active"])
+
+        with self.assertRaises(InvalidPurchaseInputError):
+            create_draft_purchase(
+                tenant=self.tenant,
+                supplier=self.supplier,
+                items=[{"product": self.product, "quantity": 1, "unit_cost": Decimal("45.00")}],
+                created_by=self.user,
+            )
 
     def test_cancel_received_purchase_success(self):
         purchase = create_draft_purchase(
@@ -374,3 +408,55 @@ class PurchasingUiTests(TestCase):
         self.assertContains(response, "Backup Supplier")
         self.assertContains(response, backup_purchase.purchase_number)
         self.assertNotContains(response, main_purchase.purchase_number)
+
+    def test_purchase_form_excludes_archived_suppliers_and_service_items(self):
+        archived_supplier = Supplier.objects.create(
+            tenant=self.tenant,
+            name="Archived Supplier",
+            is_active=False,
+        )
+        service = Product.objects.create(
+            tenant=self.tenant,
+            category=self.category,
+            name="Setup service",
+            sku="SETUP-001",
+            sale_price=Decimal("20.00"),
+            is_active=True,
+            track_inventory=False,
+        )
+
+        response = self.client.get(reverse("purchasing:purchase-create"))
+
+        self.assertContains(response, self.supplier.name)
+        self.assertNotContains(response, archived_supplier.name)
+        self.assertNotContains(response, service.name)
+
+    def test_purchase_detail_cannot_cross_tenant_boundary(self):
+        other_tenant = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        other_supplier = Supplier.objects.create(tenant=other_tenant, name="Other Supplier", is_active=True)
+        other_product = Product.objects.create(
+            tenant=other_tenant,
+            name="Other Router",
+            sku="OTHER-001",
+            sale_price=Decimal("80.00"),
+            is_active=True,
+        )
+        other_purchase = Purchase.objects.create(
+            tenant=other_tenant,
+            supplier=other_supplier,
+            purchase_number="P-OTHER",
+            order_date=date(2026, 7, 1),
+            created_by=self.user,
+        )
+        PurchaseItem.objects.create(
+            tenant=other_tenant,
+            purchase=other_purchase,
+            product=other_product,
+            quantity=1,
+            unit_cost=Decimal("45.00"),
+            line_total=Decimal("45.00"),
+        )
+
+        response = self.client.get(reverse("purchasing:purchase-detail", args=[other_purchase.id]))
+
+        self.assertEqual(response.status_code, 404)

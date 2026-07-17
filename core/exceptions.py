@@ -21,6 +21,10 @@ class PurchaseNotDraftError(DomainError):
     pass
 
 
+class InvalidPurchaseInputError(DomainError):
+    pass
+
+
 class StockAdjustmentNotDraftError(DomainError):
     pass
 

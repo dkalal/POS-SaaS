@@ -4,12 +4,19 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from catalog.models import Product
-from core.exceptions import InsufficientStockError, PurchaseAlreadyReceivedError, PurchaseNotDraftError, PurchaseNotReceivedError
+from core.exceptions import (
+    InsufficientStockError,
+    InvalidPurchaseInputError,
+    PurchaseAlreadyReceivedError,
+    PurchaseNotDraftError,
+    PurchaseNotReceivedError,
+)
 from audit.models import AuditEvent
 from audit.services import log_audit_event, snapshot_purchase
 from accounts.rbac import require_tenant_role
 from inventory.models import Stock, StockMovement
 from purchasing.models import Purchase, PurchaseItem
+from suppliers.models import Supplier
 
 
 def _money(value):
@@ -36,6 +43,26 @@ def _lock_or_create_stock(tenant, product):
     return stock
 
 
+def _validate_purchase_inputs(tenant, supplier, items):
+    if supplier is None or supplier.tenant_id != tenant.id:
+        raise InvalidPurchaseInputError("Choose a supplier from the active workspace.")
+    if not supplier.is_active:
+        raise InvalidPurchaseInputError("Archived suppliers cannot be used for new purchases.")
+    if not items:
+        raise InvalidPurchaseInputError("Add at least one physical product to the purchase.")
+
+    for item in items:
+        product = item.get("product")
+        if product is None or product.tenant_id != tenant.id:
+            raise InvalidPurchaseInputError("Purchase products must belong to the active workspace.")
+        if not product.is_active or not product.track_inventory:
+            raise InvalidPurchaseInputError("Only active physical products can be purchased into stock.")
+        if int(item.get("quantity") or 0) <= 0:
+            raise InvalidPurchaseInputError("Purchase quantities must be greater than zero.")
+        if _money(item.get("unit_cost") or 0) < Decimal("0.00"):
+            raise InvalidPurchaseInputError("Purchase unit costs cannot be negative.")
+
+
 def create_draft_purchase(tenant, supplier, items, created_by, order_date=None, expected_date=None, notes=""):
     require_tenant_role(
         created_by,
@@ -47,6 +74,8 @@ def create_draft_purchase(tenant, supplier, items, created_by, order_date=None, 
         "create draft purchase",
     )
     with transaction.atomic():
+        supplier = Supplier.objects.select_for_update().get(pk=supplier.pk, tenant=tenant)
+        _validate_purchase_inputs(tenant, supplier, items)
         purchase = Purchase.objects.create(
             tenant=tenant,
             supplier=supplier,
@@ -96,6 +125,8 @@ def update_draft_purchase(purchase_id, tenant, supplier, items, updated_by, orde
         if purchase.status != Purchase.Status.DRAFT:
             raise PurchaseNotDraftError("Only draft purchases can be edited.")
 
+        supplier = Supplier.objects.select_for_update().get(pk=supplier.pk, tenant=tenant)
+        _validate_purchase_inputs(tenant, supplier, items)
         before_data = snapshot_purchase(purchase)
         purchase.supplier = supplier
         if order_date is not None:
@@ -193,7 +224,11 @@ def receive_purchase(purchase_id, received_by):
         items = list(
             purchase.items.select_related("product").all().order_by("product_id")
         )
+        if not items:
+            raise InvalidPurchaseInputError("A purchase without items cannot be received.")
         for item in items:
+            if item.product.tenant_id != purchase.tenant_id or not item.product.track_inventory:
+                raise InvalidPurchaseInputError("Only physical products from this workspace can be received into stock.")
             stock = _lock_or_create_stock(purchase.tenant, item.product)
             quantity_before = stock.quantity
             quantity_after = quantity_before + item.quantity

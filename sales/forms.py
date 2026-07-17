@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django import forms
 
+from core.fields import MoneyField, MoneyInput
 from payments.models import Payment
 
 
@@ -30,21 +31,23 @@ class RegisterCartAdjustForm(forms.Form):
 
 
 class RegisterPricingForm(forms.Form):
-    discount = forms.DecimalField(
+    discount = MoneyField(
         required=False,
         min_value=Decimal("0.00"),
         decimal_places=2,
         max_digits=14,
         initial=Decimal("0.00"),
         label="Discount",
+        widget=MoneyInput(),
     )
-    tax = forms.DecimalField(
+    tax = MoneyField(
         required=False,
         min_value=Decimal("0.00"),
         decimal_places=2,
         max_digits=14,
         initial=Decimal("0.00"),
         label="Tax",
+        widget=MoneyInput(),
     )
 
     def __init__(self, *args, **kwargs):

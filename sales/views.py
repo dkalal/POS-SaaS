@@ -19,6 +19,7 @@ from core.exceptions import DomainError, InsufficientStockError, PaymentMethodNo
 from payments.models import Payment
 from sales.forms import RegisterCartAdjustForm, RegisterCheckoutForm, RegisterPricingForm, RegisterSearchForm
 from sales.services import calculate_sale_totals, complete_sale
+from core.money import format_money
 
 
 @contextmanager
@@ -162,6 +163,10 @@ def _register_context(request, tenant, *, search_form=None, pricing_form=None, c
         "tax": meta["tax"],
         "grand_total": Decimal("0.00"),
     }
+    for line in cart_lines:
+        line["unit_price"] = format_money(line["unit_price"], tenant.currency)
+        line["line_total"] = format_money(line["line_total"], tenant.currency)
+    totals = {key: format_money(value, tenant.currency) for key, value in totals.items()}
     q = (search_form.cleaned_data["q"] if search_form and search_form.is_valid() else (request.GET.get("q") or "")).strip()
     categories = Category.objects.filter(
         tenant=tenant,

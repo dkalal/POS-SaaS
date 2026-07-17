@@ -6,6 +6,8 @@ from django.urls import reverse
 
 from accounts.models import TenantMembership
 from catalog.models import Category, Product
+from catalog.forms import ProductForm
+from inventory.models import Stock
 from tenants.models import Tenant
 
 
@@ -294,3 +296,66 @@ class CatalogCrudTests(TestCase):
         response = self.client.get(reverse("catalog:product-list"))
 
         self.assertEqual(response.status_code, 403)
+
+    def test_cross_tenant_product_and_category_routes_are_not_visible_or_mutable(self):
+        self._login_as(self.manager)
+        other_tenant = Tenant.objects.create(name="Tenant B", slug="tenant-b")
+        other_category = Category.objects.create(tenant=other_tenant, name="Other", slug="other")
+        other_product = Product.objects.create(tenant=other_tenant, category=other_category, name="Other item", sku="OTHER-001")
+
+        for url in (
+            reverse("catalog:product-detail", args=[other_product.id]),
+            reverse("catalog:product-edit", args=[other_product.id]),
+            reverse("catalog:product-toggle-active", args=[other_product.id]),
+            reverse("catalog:category-edit", args=[other_category.id]),
+            reverse("catalog:category-toggle-active", args=[other_category.id]),
+        ):
+            response = self.client.post(url) if "toggle-active" in url else self.client.get(url)
+            self.assertEqual(response.status_code, 404)
+
+    def test_archived_categories_are_not_selectable_for_new_products(self):
+        archived = Category.objects.create(tenant=self.tenant, name="Archived", slug="archived", is_active=False)
+        form = ProductForm(tenant=self.tenant)
+        self.assertNotIn(archived, form.fields["category"].queryset)
+
+    def test_product_stock_filters_use_real_stock_and_reorder_level(self):
+        self._login_as(self.manager)
+        Stock.objects.create(tenant=self.tenant, product=self.product, quantity=2)
+        low = Product.objects.create(
+            tenant=self.tenant, category=self.category, name="Low item", sku="LOW-001", reorder_level=3,
+        )
+        Stock.objects.create(tenant=self.tenant, product=low, quantity=2)
+        out = Product.objects.create(
+            tenant=self.tenant, category=self.category, name="Out item", sku="OUT-001", reorder_level=2,
+        )
+        Stock.objects.create(tenant=self.tenant, product=out, quantity=0)
+
+        response = self.client.get(reverse("catalog:product-list"), {"stock_state": "low_stock"})
+        self.assertContains(response, "Router")
+        self.assertContains(response, "Low item")
+        self.assertNotContains(response, "Out item")
+
+        response = self.client.get(reverse("catalog:product-list"), {"stock_state": "out_of_stock"})
+        self.assertContains(response, "Out item")
+        self.assertNotContains(response, "Low item")
+
+    def test_product_edit_does_not_change_existing_stock(self):
+        self._login_as(self.manager)
+        Stock.objects.create(tenant=self.tenant, product=self.product, quantity=7)
+        response = self.client.post(
+            reverse("catalog:product-edit", args=[self.product.id]),
+            data={
+                "category": self.category.id,
+                "name": "Router Updated",
+                "sku": "RTR-001",
+                "barcode": self.product.barcode,
+                "description": "Updated",
+                "cost_price": "55.00",
+                "sale_price": "90.00",
+                "reorder_level": "6",
+                "track_inventory": "on",
+                "is_active": "on",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Stock.objects.get(tenant=self.tenant, product=self.product).quantity, 7)

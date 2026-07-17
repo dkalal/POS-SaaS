@@ -1,3 +1,4 @@
+{% load pos_format %}
 <article class="stat-card">
   <div class="stat-card-top">
     <span class="stat-icon">
@@ -19,6 +20,6 @@
       <span class="stat-link">{{ label }}</span>
     {% endif %}
   </div>
-  <div class="stat-card-value">{{ value }}</div>
+  <div class="stat-card-value">{% if label == "Total sales" or label == "Avg. order" %}{% money value %}{% else %}{{ value }}{% endif %}</div>
   {% if hint %}<div class="stat-card-hint">{{ hint }}</div>{% endif %}
 </article>

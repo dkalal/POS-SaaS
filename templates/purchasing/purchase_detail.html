@@ -82,7 +82,7 @@
         <h2 class="font-display text-2xl font-semibold">Draft actions</h2>
         <p class="mt-2 text-sm text-slate-300">You can duplicate this purchase into a fresh draft or edit it while it remains in draft state.</p>
         <div class="mt-6 flex flex-wrap gap-3">
-          <a class="button-secondary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'purchasing:purchase-duplicate' purchase.id %}">Duplicate</a>
+          <form method="post" action="{% url 'purchasing:purchase-duplicate' purchase.id %}">{% csrf_token %}<button class="button-secondary rounded-2xl px-5 py-3 text-sm font-semibold" type="submit">Duplicate</button></form>
           {% if purchase.status == 'draft' %}
             <a class="button-primary rounded-2xl px-5 py-3 text-sm font-semibold" href="{% url 'purchasing:purchase-edit' purchase.id %}">Edit draft</a>
           {% endif %}

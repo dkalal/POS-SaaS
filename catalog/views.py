@@ -7,13 +7,15 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
 from django.test.signals import template_rendered
-from django.db.models import Q
+from django.db.models import Count, F, IntegerField, Q, Value
+from django.db.models.functions import Coalesce
 from django.views.decorators.http import require_POST
 
 from accounts.models import TenantMembership
 from accounts.rbac import tenant_role_required
 from catalog.forms import CatalogFilterForm, CategoryForm, ProductForm
 from catalog.models import Category, Product
+from inventory.models import StockMovement
 
 
 @contextmanager
@@ -61,8 +63,8 @@ def _catalog_context(request, *, category_form=None, product_form=None, category
         "tenant": tenant,
         "category_form": category_form or CategoryForm(tenant=tenant),
         "product_form": product_form or ProductForm(tenant=tenant),
-        "category_filter": category_filter or CatalogFilterForm(request.GET),
-        "product_filter": product_filter or CatalogFilterForm(request.GET),
+        "category_filter": category_filter or CatalogFilterForm(request.GET, tenant=tenant),
+        "product_filter": product_filter or CatalogFilterForm(request.GET, tenant=tenant),
         "can_manage_catalog": True,
     }
 
@@ -78,8 +80,10 @@ def category_list(request):
     if response is not None:
         return response
 
-    category_filter = CatalogFilterForm(request.GET)
-    categories = Category.objects.filter(tenant=tenant).order_by("sort_order", "name", "id")
+    category_filter = CatalogFilterForm(request.GET, tenant=tenant)
+    categories = Category.objects.filter(tenant=tenant).annotate(
+        active_product_count=Count("products", filter=Q(products__tenant=tenant, products__is_active=True), distinct=True)
+    ).order_by("sort_order", "name", "id")
     if category_filter.is_valid():
         q = (category_filter.cleaned_data.get("q") or "").strip()
         status = category_filter.cleaned_data.get("status") or ""
@@ -132,6 +136,24 @@ def category_edit(request, category_id):
 @tenant_role_required(
     TenantMembership.Role.OWNER_ADMIN,
     TenantMembership.Role.MANAGER,
+    action_name="create categories",
+)
+def category_create(request):
+    tenant, response = _tenant_or_redirect(request)
+    if response is not None:
+        return response
+    category_form = CategoryForm(request.POST or None, tenant=tenant)
+    if request.method == "POST" and category_form.is_valid():
+        category_form.save()
+        messages.success(request, "Category created.")
+        return redirect("catalog:category-list")
+    return _html_response(request, "catalog/category_form.html", _catalog_context(request, category_form=category_form))
+
+
+@login_required
+@tenant_role_required(
+    TenantMembership.Role.OWNER_ADMIN,
+    TenantMembership.Role.MANAGER,
     action_name="toggle category status",
 )
 @require_POST
@@ -161,11 +183,16 @@ def product_list(request):
     if response is not None:
         return response
 
-    product_filter = CatalogFilterForm(request.GET)
-    products = Product.objects.select_related("category").filter(tenant=tenant).order_by("name", "id")
+    product_filter = CatalogFilterForm(request.GET, tenant=tenant)
+    products = Product.objects.select_related("category", "stock").filter(tenant=tenant).annotate(
+        current_stock=Coalesce("stock__quantity", Value(0), output_field=IntegerField())
+    ).order_by("name", "id")
     if product_filter.is_valid():
         q = (product_filter.cleaned_data.get("q") or "").strip()
         status = product_filter.cleaned_data.get("status") or ""
+        category = product_filter.cleaned_data.get("category")
+        item_type = product_filter.cleaned_data.get("item_type") or ""
+        stock_state = product_filter.cleaned_data.get("stock_state") or ""
         if q:
             products = products.filter(
                 Q(name__icontains=q)
@@ -178,6 +205,20 @@ def product_list(request):
             products = products.filter(is_active=True)
         elif status == "inactive":
             products = products.filter(is_active=False)
+        if category is not None:
+            products = products.filter(category=category)
+        if item_type == "physical":
+            products = products.filter(track_inventory=True)
+        elif item_type == "service":
+            products = products.filter(track_inventory=False)
+        if stock_state == "in_stock":
+            products = products.filter(
+                Q(track_inventory=True) & Q(current_stock__gt=0) & Q(current_stock__gt=F("reorder_level"))
+            )
+        elif stock_state == "low_stock":
+            products = products.filter(track_inventory=True, current_stock__gt=0, current_stock__lte=F("reorder_level"))
+        elif stock_state == "out_of_stock":
+            products = products.filter(track_inventory=True, current_stock=0)
 
     product_page, query_params = _paginate(products, request)
     product_form = ProductForm(request.POST or None, tenant=tenant)
@@ -190,6 +231,24 @@ def product_list(request):
     context["products"] = product_page
     context["product_query_string"] = query_params
     return _html_response(request, "catalog/product_list.html", context)
+
+
+@login_required
+@tenant_role_required(
+    TenantMembership.Role.OWNER_ADMIN,
+    TenantMembership.Role.MANAGER,
+    action_name="create products",
+)
+def product_create(request):
+    tenant, response = _tenant_or_redirect(request)
+    if response is not None:
+        return response
+    product_form = ProductForm(request.POST or None, tenant=tenant)
+    if request.method == "POST" and product_form.is_valid():
+        product_form.save()
+        messages.success(request, "Product created.")
+        return redirect("catalog:product-list")
+    return _html_response(request, "catalog/product_form.html", _catalog_context(request, product_form=product_form))
 
 
 @login_required
@@ -213,6 +272,29 @@ def product_edit(request, product_id):
     context = _catalog_context(request, product_form=product_form)
     context["editing_product"] = product
     return _html_response(request, "catalog/product_form.html", context)
+
+
+@login_required
+@tenant_role_required(
+    TenantMembership.Role.OWNER_ADMIN,
+    TenantMembership.Role.MANAGER,
+    action_name="view product details",
+)
+def product_detail(request, product_id):
+    tenant, response = _tenant_or_redirect(request)
+    if response is not None:
+        return response
+    product = get_object_or_404(
+        Product.objects.select_related("category", "stock"),
+        pk=product_id,
+        tenant=tenant,
+    )
+    movements = StockMovement.objects.filter(tenant=tenant, product=product).select_related("created_by")[:8]
+    return _html_response(
+        request,
+        "catalog/product_detail.html",
+        {"tenant": tenant, "product": product, "movements": movements, "current_stock": getattr(getattr(product, "stock", None), "quantity", 0)},
+    )
 
 
 @login_required

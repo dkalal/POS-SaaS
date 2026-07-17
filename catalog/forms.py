@@ -1,7 +1,9 @@
 from django import forms
+from django.db.models import Q
 
 from catalog.models import Category, Product
 from catalog.services import generate_product_sku, normalize_sku
+from core.fields import MoneyField, MoneyInput
 
 
 def _style_text_field(field):
@@ -13,11 +15,11 @@ def _style_text_field(field):
 
 
 def _style_checkbox_field(field):
-        field.widget.attrs.update(
-            {
-                "class": "app-check",
-            }
-        )
+    field.widget.attrs.update(
+        {
+            "class": "app-check",
+        }
+    )
 
 
 class TenantBoundModelForm(forms.ModelForm):
@@ -33,29 +35,46 @@ class TenantBoundModelForm(forms.ModelForm):
 
 class CatalogFilterForm(forms.Form):
     q = forms.CharField(required=False, label="Search")
+    category = forms.ModelChoiceField(queryset=Category.objects.none(), required=False, label="Category")
+    item_type = forms.ChoiceField(
+        required=False,
+        choices=(("", "All item types"), ("physical", "Physical product"), ("service", "Service")),
+        label="Item type",
+    )
     status = forms.ChoiceField(
         required=False,
         choices=(
-            ("", "All"),
+            ("", "All statuses"),
             ("active", "Active"),
             ("inactive", "Inactive"),
         ),
         label="Status",
     )
+    stock_state = forms.ChoiceField(
+        required=False,
+        choices=(
+            ("", "All stock states"),
+            ("in_stock", "In stock"),
+            ("low_stock", "Low stock"),
+            ("out_of_stock", "Out of stock"),
+        ),
+        label="Stock state",
+    )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, tenant=None, category_queryset=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = category_queryset or (
+            Category.objects.filter(tenant=tenant, is_active=True).order_by("sort_order", "name")
+            if tenant is not None else Category.objects.none()
+        )
         self.fields["q"].widget.attrs.update(
             {
                 "class": "app-field",
-                "placeholder": "Search by name, SKU, slug, or barcode",
+                "placeholder": "Search name, SKU, or barcode",
             }
         )
-        self.fields["status"].widget.attrs.update(
-            {
-                "class": "app-field",
-            }
-        )
+        for field in self.fields.values():
+            field.widget.attrs.update({"class": "app-field"})
 
 
 class CategoryForm(TenantBoundModelForm):
@@ -78,6 +97,13 @@ class CategoryForm(TenantBoundModelForm):
 
 
 class ProductForm(TenantBoundModelForm):
+    cost_price = MoneyField(
+        min_value=0, max_digits=12, decimal_places=2, widget=MoneyInput(), label="Cost price"
+    )
+    sale_price = MoneyField(
+        min_value=0, max_digits=12, decimal_places=2, widget=MoneyInput(), label="Selling price"
+    )
+
     class Meta:
         model = Product
         fields = [
@@ -99,9 +125,12 @@ class ProductForm(TenantBoundModelForm):
     def __init__(self, *args, tenant=None, **kwargs):
         super().__init__(*args, tenant=tenant, **kwargs)
         self.instance.tenant = tenant
-        self.fields["category"].queryset = (
-            Category.objects.filter(tenant=tenant).order_by("-is_active", "name", "id") if tenant is not None else Category.objects.none()
-        )
+        category_queryset = Category.objects.filter(tenant=tenant) if tenant is not None else Category.objects.none()
+        if self.instance.pk and self.instance.category_id:
+            category_queryset = category_queryset.filter(Q(is_active=True) | Q(pk=self.instance.category_id))
+        else:
+            category_queryset = category_queryset.filter(is_active=True)
+        self.fields["category"].queryset = category_queryset.order_by("-is_active", "name", "id")
         self.fields["category"].required = False
         self.fields["sku"].required = False
         self.fields["sku"].help_text = "Leave blank to auto-generate. Must be unique within this business."
@@ -134,4 +163,7 @@ class ProductForm(TenantBoundModelForm):
                 duplicates = duplicates.exclude(pk=self.instance.pk)
             if duplicates.exists():
                 self.add_error("sku", "A product with this SKU already exists in this business.")
+        category = cleaned_data.get("category")
+        if category is not None and not category.is_active and category.pk != self.instance.category_id:
+            self.add_error("category", "Choose an active category for a new product.")
         return cleaned_data

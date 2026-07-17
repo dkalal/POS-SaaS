@@ -25,6 +25,7 @@ from purchasing.services import (
     receive_purchase,
     update_draft_purchase,
 )
+from core.money import format_money
 from suppliers.models import Supplier
 
 
@@ -113,6 +114,8 @@ def purchase_list(request):
         q = (purchase_filter.cleaned_data.get("q") or "").strip()
         status = purchase_filter.cleaned_data.get("status") or ""
         supplier_id = purchase_filter.cleaned_data.get("supplier") or ""
+        date_from = purchase_filter.cleaned_data.get("date_from")
+        date_to = purchase_filter.cleaned_data.get("date_to")
         if q:
             purchases = purchases.filter(
                 Q(purchase_number__icontains=q)
@@ -120,14 +123,23 @@ def purchase_list(request):
                 | Q(cancelled_reason__icontains=q)
                 | Q(supplier__name__icontains=q)
                 | Q(supplier__supplier_code__icontains=q)
-            )
+                | Q(items__product__sku__icontains=q)
+                | Q(items__product__name__icontains=q)
+                | Q(items__product__barcode__icontains=q)
+            ).distinct()
         if status:
             purchases = purchases.filter(status=status)
         if supplier_id:
             purchases = purchases.filter(supplier_id=supplier_id)
+        if date_from:
+            purchases = purchases.filter(order_date__gte=date_from)
+        if date_to:
+            purchases = purchases.filter(order_date__lte=date_to)
 
     purchases = purchases.annotate(total_amount=Coalesce(Sum("items__line_total"), Decimal("0.00"))).order_by("-order_date", "-id")
     purchase_page, query_string = _paginate(purchases, request)
+    for purchase in purchase_page:
+        purchase.total_amount = format_money(purchase.total_amount, tenant.currency)
     context = _purchase_context(request, purchase_filter=purchase_filter)
     context["purchases"] = purchase_page
     context["purchase_query_string"] = query_string
@@ -310,8 +322,8 @@ def purchase_detail(request, purchase_id):
         {
             "product": item.product,
             "quantity": item.quantity,
-            "unit_cost": item.unit_cost,
-            "line_total": item.line_total,
+            "unit_cost": format_money(item.unit_cost, tenant.currency),
+            "line_total": format_money(item.line_total, tenant.currency),
         }
         for item in items
     ]
@@ -323,7 +335,7 @@ def purchase_detail(request, purchase_id):
             "tenant": tenant,
             "purchase": purchase,
             "items": purchase_items,
-            "total_amount": total_amount,
+            "total_amount": format_money(total_amount, tenant.currency),
             "can_manage_purchases": True,
         },
     )
@@ -335,6 +347,7 @@ def purchase_detail(request, purchase_id):
     TenantMembership.Role.MANAGER,
     action_name="duplicate purchase",
 )
+@require_POST
 def purchase_duplicate(request, purchase_id):
     tenant, response = _tenant_or_redirect(request)
     if response is not None:

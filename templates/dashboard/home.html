@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load pos_format %}
 {% block title %}Dashboard | POS SaaS{% endblock %}
 {% block content %}
 <div class="stack">
@@ -102,7 +103,7 @@
                   <div class="h-3 rounded-full bg-slate-200 dark:bg-slate-800">
                     <div class="h-3 rounded-full bg-blue-600" style="width: {{ row.bar_percent }}%; min-width: 0.35rem;"></div>
                   </div>
-                  <div class="text-sm font-bold md:text-right">{{ row.total }}</div>
+                  <div class="text-sm font-bold md:text-right">{% money row.total %}</div>
                 </div>
               {% endfor %}
             </div>
@@ -170,7 +171,7 @@
                     <td class="font-bold">{{ sale.receipt_number|default:sale.sale_number }}</td>
                     <td>{{ sale.created_at|date:"M j, Y H:i" }}</td>
                     <td>{{ sale.cashier }}</td>
-                    <td>{{ sale.grand_total }}</td>
+                    <td>{% money sale.grand_total %}</td>
                     <td><span class="status-pill status-success">{{ sale.status }}</span></td>
                   </tr>
                 {% empty %}
@@ -209,11 +210,11 @@
             </div>
             <div class="card-soft flex items-center justify-between gap-3 p-3">
               <span class="app-note">Stock value</span>
-              <strong>{{ stats.stock_value }}</strong>
+              <strong>{% money stats.stock_value %}</strong>
             </div>
             <div class="card-soft flex items-center justify-between gap-3 p-3">
               <span class="app-note">Purchase spend</span>
-              <strong>{{ stats.purchase_spend }}</strong>
+              <strong>{% money stats.purchase_spend %}</strong>
             </div>
           </div>
         </section>

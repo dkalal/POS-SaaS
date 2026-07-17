@@ -260,6 +260,7 @@
     .status-success { background: var(--success-soft); color: var(--success); }
     .status-warning { background: var(--warning-soft); color: var(--warning); }
     .status-danger { background: var(--danger-soft); color: var(--danger); }
+    .status-neutral { background: var(--panel-muted); color: var(--soft); border: 1px solid var(--border); }
     /* Compatibility layer for the first management screens while they use the shared shell. */
     .glass {
       border: 1px solid var(--border);
@@ -489,6 +490,20 @@
       document.addEventListener("keydown", function (event) {
         if (event.key === "Escape") {
           closeMobileSidebar();
+        }
+      });
+      document.querySelectorAll("[data-money-input]").forEach(function (input) {
+        input.addEventListener("blur", function () {
+          var raw = input.value.replace(/,/g, "").trim();
+          if (!raw || isNaN(Number(raw))) return;
+          var parts = raw.split(".");
+          parts[0] = Number(parts[0]).toLocaleString("en-US");
+          input.value = parts[0] + (parts[1] !== undefined ? "." + parts[1].slice(0, 2) : "");
+        });
+        if (input.form) {
+          input.form.addEventListener("submit", function () {
+            input.value = input.value.replace(/,/g, "").trim();
+          });
         }
       });
     }());
