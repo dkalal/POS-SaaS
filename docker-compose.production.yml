@@ -1,0 +1,41 @@
+services:
+  web:
+    image: ${POS_SAAS_IMAGE:?Set POS_SAAS_IMAGE to the immutable release image}
+    env_file:
+      - ${DEPLOY_ENV_FILE:-.env.production}
+    volumes:
+      - type: bind
+        source: ${SECRETS_DIR:?Set SECRETS_DIR to the read-only secret directory}
+        target: /run/secrets
+        read_only: true
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    tmpfs:
+      - /tmp:mode=1777,noexec,nosuid,size=64m
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  migrate:
+    image: ${POS_SAAS_IMAGE:?Set POS_SAAS_IMAGE to the immutable release image}
+    profiles: ["release"]
+    env_file:
+      - ${DEPLOY_ENV_FILE:-.env.production}
+    volumes:
+      - type: bind
+        source: ${SECRETS_DIR:?Set SECRETS_DIR to the read-only secret directory}
+        target: /run/secrets
+        read_only: true
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true

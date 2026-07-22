@@ -4,9 +4,7 @@
 <div class="mx-auto w-full max-w-2xl py-8"><section class="page-section surface-strong">
   <span class="chip">Start your workspace</span><h1 class="page-title mt-4 text-3xl font-bold sm:text-5xl">Run your business with clarity.</h1>
   <p class="mt-3 max-w-xl app-note">Create your POS workspace in a few minutes. Tanzania-friendly defaults are ready, and you can change them later.</p>
-  <form method="post" class="mt-8 grid gap-5" novalidate>{% csrf_token %}{% if form.non_field_errors %}<div class="message-error">{{ form.non_field_errors }}</div>{% endif %}
-    {% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}{% if field.errors %}<div class="text-sm text-rose-200">{{ field.errors }}</div>{% endif %}</div>{% endfor %}
-    <button class="button-primary justify-self-start" type="submit">Create workspace</button>
-  </form><p class="mt-6 text-sm app-note">Already have an account? <a class="text-sky-300" href="{% url 'login' %}">Sign in</a>.</p>
+  {% include "accounts/partials/signup_form.html" with form=form %}
+  <p class="mt-6 text-sm app-note">Already have an account? <a class="text-sky-600" href="{% url 'login' %}">Sign in</a>.</p>
 </section></div>
 {% endblock %}

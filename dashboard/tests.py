@@ -114,3 +114,22 @@ class DashboardTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("login"))
         self.assertEqual(self.client.get(reverse("dashboard")).status_code, 302)
+
+    def test_cashier_is_sent_to_register_instead_of_management_dashboard(self):
+        cashier = User.objects.create_user(username="cashier", password="pass12345")
+        TenantMembership.objects.create(
+            tenant=self.tenant_a,
+            user=cashier,
+            role=TenantMembership.Role.CASHIER,
+            is_active=True,
+        )
+        self.client.force_login(cashier)
+        session = self.client.session
+        session["current_tenant_id"] = self.tenant_a.id
+        session.save()
+
+        response = self.client.get(reverse("dashboard"))
+
+        self.assertRedirects(response, reverse("sales:register"))
+        self.assertNotContains(response, "Operating totals", status_code=302)
+        self.assertEqual(self.client.get(reverse("sales:register")).status_code, 200)

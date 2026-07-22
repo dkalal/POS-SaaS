@@ -1,0 +1,8 @@
+# Local workstation overlay loaded automatically by `docker compose`.
+# It keeps the application reachable only on this trusted LAN interface.
+services:
+  web:
+    ports:
+      - "10.10.10.254:8002:8000"
+    environment:
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0,10.10.10.254

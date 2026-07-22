@@ -17,6 +17,8 @@ class Tenant(TimeStampedModel):
     contact_email = models.EmailField(blank=True)
     contact_phone = models.CharField(max_length=64, blank=True)
     address = models.TextField(blank=True)
+    tax_identification_number = models.CharField(max_length=64, blank=True)
+    vat_registration_number = models.CharField(max_length=64, blank=True)
     country = models.CharField(max_length=2, default="TZ")
     currency = models.CharField(max_length=3, default="TZS")
     timezone = models.CharField(max_length=64, default="Africa/Dar_es_Salaam")
@@ -24,6 +26,8 @@ class Tenant(TimeStampedModel):
     default_tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     default_track_inventory = models.BooleanField(default=True)
     receipt_business_details = models.TextField(blank=True)
+    receipt_footer = models.TextField(blank=True)
+    default_reorder_level = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.TRIAL)
     trial_ends_at = models.DateTimeField(blank=True, null=True)
     subscription_plan = models.ForeignKey(

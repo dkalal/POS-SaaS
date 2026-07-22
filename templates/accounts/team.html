@@ -1,12 +1,64 @@
 {% extends "base.html" %}
 {% block title %}Team | POS SaaS{% endblock %}
 {% block content %}
-{% url 'api-key-management' as api_keys_url %}
 <div class="stack">
-  {% include "components/management_header.html" with section_label="Workspace access" page_heading="Team" page_description="Invite colleagues, review tenant memberships, and manage pending access securely." secondary_url=api_keys_url secondary_label="API keys" %}
-  <section class="content-grid split">
+  <section class="page-section">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div><p class="section-eyebrow">Workspace access</p><h1 class="page-heading">Team</h1><p class="mt-1 app-note">Manage people and pending invitations for {{ tenant.name }} only.</p></div>
+      <a class="button-primary" href="#invite-member">Invite member</a>
+    </div>
+  </section>
+
+  <section class="page-section">
+    <form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem_auto]" method="get" role="search">
+      <label><span class="sr-only">Search by name or email</span><input class="app-field" type="search" name="q" value="{{ query }}" placeholder="Search name or email"></label>
+      <label><span class="sr-only">Filter by role</span><select class="app-field" name="role"><option value="">All roles</option>{% for value, label in role_choices %}<option value="{{ value }}" {% if role_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label><span class="sr-only">Filter by status</span><select class="app-field" name="status"><option value="">All statuses</option><option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option><option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option><option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending invitation</option></select></label>
+      <button class="button-secondary" type="submit">Apply filters</button>
+    </form>
+
+    {% if team_rows %}
+      <div class="responsive-table-wrap mt-4">
+        <table>
+          <thead class="tabular-head"><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Invited / joined</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody class="tabular-body">
+            {% for row in team_rows %}
+              <tr>
+                <td><strong>{{ row.name }}</strong></td><td>{{ row.email }}</td>
+                <td>{% include "components/member_role_badge.html" with role=row.role label=row.role_label %}</td>
+                <td>{% if row.kind == "invitation" %}{% include "components/invitation_status_badge.html" with status=row.status label=row.status_label %}{% else %}{% include "components/member_status_badge.html" with status=row.status label=row.status_label %}{% endif %}</td>
+                <td>{{ row.date|date:"M j, Y" }}</td>
+                <td>
+                  <div class="flex flex-wrap justify-end gap-2">
+                    {% if row.kind == "member" %}
+                      <a class="button-secondary" href="{% url 'member-detail' row.membership.id %}">View</a>
+                      {% if row.can_manage %}
+                        <details class="relative"><summary class="button-secondary">Change role</summary><div class="absolute right-0 z-20 mt-2 w-64 card-soft p-3 shadow-xl"><form method="post" action="{% url 'change_member_role' row.membership.id %}">{% csrf_token %}<label class="text-sm font-semibold" for="role-{{ row.membership.id }}">New role</label><select id="role-{{ row.membership.id }}" class="app-field mt-2" name="role">{% for value, label in grantable_role_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select><button class="button-primary mt-3 w-full" type="submit">Save role</button></form></div></details>
+                        {% if row.status == "active" %}
+                          {% url 'change_member_status' row.membership.id as status_action %}{% include "components/confirmation_dialog.html" with action_url=status_action status_value="suspended" trigger_label="Deactivate" title="Deactivate membership?" message="This person will immediately lose access to this workspace." danger=True %}
+                        {% else %}
+                          {% url 'change_member_status' row.membership.id as status_action %}{% include "components/confirmation_dialog.html" with action_url=status_action status_value="active" trigger_label="Reactivate" title="Reactivate membership?" message="This person will regain access with their current role." %}
+                        {% endif %}
+                        {% if row.status != "removed" %}{% url 'change_member_status' row.membership.id as remove_action %}{% include "components/confirmation_dialog.html" with action_url=remove_action status_value="removed" trigger_label="Remove" title="Remove membership?" message="The membership record and audit history will be retained, but access will be removed." danger=True %}{% endif %}
+                      {% endif %}
+                    {% else %}
+                      <form method="post" action="{% url 'resend_tenant_invitation' row.invitation.id %}">{% csrf_token %}<button class="button-secondary" type="submit">Resend</button></form>
+                      {% url 'revoke_tenant_invitation' row.invitation.id as revoke_action %}{% include "components/confirmation_dialog.html" with action_url=revoke_action trigger_label="Revoke" title="Revoke invitation?" message="The existing invitation link will stop working immediately." danger=True %}
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      {% include "components/empty_state.html" with title="No team records found" message="Invite a teammate or adjust the current filters." %}
+    {% endif %}
+  </section>
+
+  <section id="invite-member" class="page-section scroll-mt-4">
     {% include "accounts/partials/invitation_panel.html" %}
-    <aside class="page-section"><div class="table-toolbar"><div><h2>Access policy</h2><p>Membership rules are enforced by the server.</p></div></div><div class="grid gap-3 text-sm"><div class="card-soft p-3"><strong>Owner/Admin</strong><p class="mt-1 app-note">Can invite, revoke, and administer workspace access.</p></div><div class="card-soft p-3"><strong>Manager</strong><p class="mt-1 app-note">Runs operational workflows within the tenant.</p></div><div class="card-soft p-3"><strong>Cashier</strong><p class="mt-1 app-note">Uses the sales workflow with restricted back-office access.</p></div><p class="app-note">Pending invitations expire after seven days and can be revoked at any time.</p></div></aside>
   </section>
 </div>
 {% endblock %}

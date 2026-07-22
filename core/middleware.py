@@ -1,7 +1,55 @@
+import logging
+import time
+import uuid
+
 from accounts.models import TenantMembership
 from core.tenant_context import reset_current_tenant_id, set_current_tenant_id
 from django.utils.cache import patch_cache_control
 from django.shortcuts import redirect
+
+
+request_logger = logging.getLogger("pos_saas.request")
+
+
+class RequestLoggingMiddleware:
+    """Emit safe request telemetry without URLs, credentials, or request bodies."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        request_id = request.headers.get("X-Request-ID", "")
+        if not request_id.isascii() or not request_id.replace("-", "").isalnum() or len(request_id) > 64:
+            request_id = str(uuid.uuid4())
+        started = time.perf_counter()
+        try:
+            response = self.get_response(request)
+        except Exception:
+            request_logger.exception(
+                "request_failed",
+                extra={
+                    "request_id": request_id,
+                    "method": request.method,
+                    "path": request.path,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+            )
+            raise
+
+        response["X-Request-ID"] = request_id
+        tenant = getattr(request, "tenant", None)
+        request_logger.info(
+            "request_complete",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "path": request.path,
+                "status_code": response.status_code,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                "tenant_id": getattr(tenant, "pk", None),
+            },
+        )
+        return response
 
 
 class AuthenticatedResponseCacheControlMiddleware:

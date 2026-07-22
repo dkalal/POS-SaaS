@@ -1,0 +1,19 @@
+<div class="responsive-table-wrap">
+  <table>
+    <thead class="tabular-head"><tr><th class="text-left">Workspace</th><th class="text-left">Owner / contact</th><th class="text-left">Created</th><th class="text-left">Lifecycle</th><th class="text-left">Onboarding</th><th class="text-right">Action</th></tr></thead>
+    <tbody class="tabular-body">
+      {% for tenant in tenants %}
+        <tr>
+          <td><strong>{{ tenant.name }}</strong><small class="block app-note">{{ tenant.slug }} &middot; {{ tenant.active_users }} active users</small></td>
+          <td>{% with owner=tenant.active_owners.0 %}<strong>{{ owner.user.get_full_name|default:tenant.contact_name|default:"Not provided" }}</strong><small class="block app-note">{{ owner.user.email|default:tenant.contact_email|default:"No email" }}</small>{% endwith %}</td>
+          <td>{{ tenant.created_at|date:"M j, Y" }}</td>
+          <td>{% include "components/platform_status_badge.html" with tenant=tenant %}</td>
+          <td>{% if tenant.onboarding.completed_at %}<span class="status-pill status-success">Complete</span>{% elif tenant.onboarding.dismissed_at %}<span class="status-pill status-neutral">Dismissed</span>{% else %}<span class="status-pill status-warning">In progress</span>{% endif %}</td>
+          <td><div class="flex justify-end"><a class="button-secondary" href="{% url 'platform_admin:tenant-detail' tenant.pk %}">Review</a></div></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">{% include "components/empty_state.html" with title="No tenants yet" message="New self-service workspaces will appear here." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

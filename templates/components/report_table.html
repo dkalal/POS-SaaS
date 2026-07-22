@@ -1,0 +1,6 @@
+<section class="page-section">
+  <div class="table-toolbar"><div><h2>{{ table_title }}</h2>{% if table_description %}<p>{{ table_description }}</p>{% endif %}</div></div>
+  {% include table_template %}
+  {% if page_obj %}{% include "components/pagination.html" with page_obj=page_obj query_string=query_string %}{% endif %}
+</section>
+

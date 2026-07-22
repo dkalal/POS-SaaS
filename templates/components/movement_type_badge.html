@@ -1,0 +1,1 @@
+{% if movement.quantity_delta > 0 %}<span class="status-pill status-success">{{ movement.get_movement_type_display }}</span>{% else %}<span class="status-pill status-warning">{{ movement.get_movement_type_display }}</span>{% endif %}

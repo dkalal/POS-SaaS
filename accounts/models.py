@@ -35,6 +35,10 @@ class TenantMembership(TenantScopedModel):
             models.Index(fields=["tenant", "user"]),
             models.Index(fields=["tenant", "role"]),
             models.Index(fields=["tenant", "is_active"]),
+            models.Index(
+                fields=["user", "status", "is_active", "tenant"],
+                name="accounts_mem_resolve_idx",
+            ),
         ]
         ordering = ["tenant_id", "user_id"]
 
@@ -44,8 +48,12 @@ class TenantMembership(TenantScopedModel):
             raise ValidationError("Platform administrators cannot belong to a tenant workspace.")
 
     def save(self, *args, **kwargs):
+        if self.user_id and getattr(self.user, "is_superuser", False):
+            raise ValidationError("Platform administrators cannot belong to a tenant workspace.")
         if self.status in (self.Status.SUSPENDED, self.Status.REMOVED, self.Status.INVITED):
             self.is_active = False
+        elif self.status == self.Status.ACTIVE:
+            self.is_active = True
         if self.is_active and not self.joined_at:
             self.joined_at = timezone.now()
         super().save(*args, **kwargs)

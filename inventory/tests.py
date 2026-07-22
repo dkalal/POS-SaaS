@@ -301,3 +301,61 @@ class StockAdjustmentUiTests(TestCase):
 
         response = self.client.get(reverse("inventory:adjustment-list"))
         self.assertEqual(response.status_code, 403)
+
+
+class InventoryVisibilityTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(username="inventory-owner", password="pass12345")
+        self.cashier = User.objects.create_user(username="inventory-cashier", password="pass12345")
+        self.tenant = Tenant.objects.create(name="Inventory A", slug="inventory-a")
+        self.other_tenant = Tenant.objects.create(name="Inventory B", slug="inventory-b")
+        TenantMembership.objects.create(tenant=self.tenant, user=self.owner, role=TenantMembership.Role.OWNER_ADMIN, is_active=True)
+        TenantMembership.objects.create(tenant=self.tenant, user=self.cashier, role=TenantMembership.Role.CASHIER, is_active=True)
+        self.category = Category.objects.create(tenant=self.tenant, name="Hardware", slug="hardware", is_active=True)
+        self.in_stock = Product.objects.create(tenant=self.tenant, category=self.category, name="In stock router", sku="RTR-100", barcode="100", reorder_level=3, is_active=True)
+        self.low_stock = Product.objects.create(tenant=self.tenant, category=self.category, name="Low stock switch", sku="SWT-200", barcode="200", reorder_level=3, is_active=True)
+        self.out_of_stock = Product.objects.create(tenant=self.tenant, category=self.category, name="Out stock cable", sku="CBL-300", barcode="300", reorder_level=2, is_active=True)
+        self.service = Product.objects.create(tenant=self.tenant, category=self.category, name="Installation", sku="SRV-400", track_inventory=False, is_active=True)
+        self.stock = Stock.objects.create(tenant=self.tenant, product=self.in_stock, quantity=7)
+        Stock.objects.create(tenant=self.tenant, product=self.low_stock, quantity=2)
+        Stock.objects.create(tenant=self.tenant, product=self.out_of_stock, quantity=0)
+        StockMovement.objects.create(tenant=self.tenant, stock=self.stock, product=self.in_stock, movement_type=StockMovement.MovementType.PURCHASE_IN, reference_type=StockMovement.ReferenceType.PURCHASE, reference_id=42, quantity_delta=7, quantity_before=0, quantity_after=7, created_by=self.owner, note="Initial receiving")
+        self.other_product = Product.objects.create(tenant=self.other_tenant, name="Other tenant item", sku="OTH-001", is_active=True)
+        self.other_stock = Stock.objects.create(tenant=self.other_tenant, product=self.other_product, quantity=9)
+        StockMovement.objects.create(tenant=self.other_tenant, stock=self.other_stock, product=self.other_product, movement_type=StockMovement.MovementType.PURCHASE_IN, reference_type=StockMovement.ReferenceType.PURCHASE, reference_id=99, quantity_delta=9, quantity_before=0, quantity_after=9, created_by=self.owner)
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session["current_tenant_id"] = self.tenant.id
+        session.save()
+
+    def test_overview_is_tenant_scoped_and_excludes_services(self):
+        response = self.client.get(reverse("inventory:overview"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "In stock router")
+        self.assertNotContains(response, "Installation")
+        self.assertNotContains(response, "Other tenant item")
+        self.assertContains(response, "Low stock")
+        self.assertContains(response, "Out of stock")
+
+    def test_inventory_search_uses_sku_name_and_barcode(self):
+        for query in ("RTR-100", "switch", "300"):
+            response = self.client.get(reverse("inventory:overview"), {"q": query})
+            self.assertEqual(response.status_code, 200)
+        self.assertContains(self.client.get(reverse("inventory:overview"), {"q": "300"}), "Out stock cable")
+
+    def test_ledger_and_history_are_read_only_and_tenant_scoped(self):
+        ledger = self.client.get(reverse("inventory:movement-ledger"))
+        self.assertContains(ledger, "Initial receiving")
+        self.assertNotContains(ledger, "Other tenant item")
+        history = self.client.get(reverse("inventory:product-history", args=[self.in_stock.id]))
+        self.assertContains(history, "Purchase In")
+        self.assertNotContains(history, "Edit")
+        self.assertEqual(self.client.get(reverse("inventory:product-history", args=[self.other_product.id])).status_code, 404)
+
+    def test_cashier_cannot_view_inventory_or_ledger(self):
+        self.client.force_login(self.cashier)
+        session = self.client.session
+        session["current_tenant_id"] = self.tenant.id
+        session.save()
+        self.assertEqual(self.client.get(reverse("inventory:overview")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("inventory:movement-ledger")).status_code, 403)

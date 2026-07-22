@@ -4,8 +4,8 @@ from django import forms
 from django.forms import BaseFormSet, formset_factory
 from django.db import models
 
-from catalog.models import Product
-from inventory.models import StockAdjustment
+from catalog.models import Category, Product
+from inventory.models import StockAdjustment, StockMovement
 
 
 def _style_field(field):
@@ -44,6 +44,42 @@ class AdjustmentFilterForm(forms.Form):
                 "class": "app-field",
             }
         )
+
+
+class InventoryFilterForm(forms.Form):
+    q = forms.CharField(required=False, label="Search")
+    category = forms.ModelChoiceField(queryset=Category.objects.none(), required=False, empty_label="All categories")
+    stock_status = forms.ChoiceField(
+        required=False,
+        choices=(("", "All stock statuses"), ("in_stock", "In stock"), ("low_stock", "Low stock"), ("out_of_stock", "Out of stock")),
+        label="Stock status",
+    )
+    status = forms.ChoiceField(required=False, choices=(("", "All products"), ("active", "Active"), ("archived", "Archived")), label="Product status")
+
+    def __init__(self, *args, tenant=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["category"].queryset = Category.objects.filter(tenant=tenant).order_by("sort_order", "name") if tenant else Category.objects.none()
+        self.fields["q"].widget.attrs["placeholder"] = "SKU, product name, or barcode"
+        for field in self.fields.values():
+            _style_field(field)
+
+
+class MovementFilterForm(forms.Form):
+    date_from = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}), label="From")
+    date_to = forms.DateField(required=False, widget=forms.DateInput(attrs={"type": "date"}), label="To")
+    product = forms.ModelChoiceField(queryset=Product.objects.none(), required=False, empty_label="All products")
+    category = forms.ModelChoiceField(queryset=Category.objects.none(), required=False, empty_label="All categories")
+    movement_type = forms.ChoiceField(required=False, choices=(("", "All movement types"),) + tuple(StockMovement.MovementType.choices))
+    reference = forms.CharField(required=False, label="Reference")
+
+    def __init__(self, *args, tenant=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        products = Product.objects.filter(tenant=tenant, track_inventory=True).order_by("name", "sku") if tenant else Product.objects.none()
+        self.fields["product"].queryset = products
+        self.fields["category"].queryset = Category.objects.filter(tenant=tenant).order_by("sort_order", "name") if tenant else Category.objects.none()
+        self.fields["reference"].widget.attrs["placeholder"] = "Purchase, sale, or adjustment number"
+        for field in self.fields.values():
+            _style_field(field)
 
 
 class StockAdjustmentForm(forms.ModelForm):

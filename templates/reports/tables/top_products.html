@@ -1,0 +1,2 @@
+<div class="responsive-table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th>Quantity sold</th><th>Revenue</th></tr></thead><tbody>{% for row in top_products %}<tr><td>{{ row.product__name }}</td><td>{{ row.product__sku }}</td><td>{{ row.quantity_sold }}</td><td>{% load pos_format %}{% money row.revenue %}</td></tr>{% empty %}<tr><td colspan="4">No product sales.</td></tr>{% endfor %}</tbody></table></div>
+

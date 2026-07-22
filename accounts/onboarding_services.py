@@ -17,6 +17,15 @@ from audit.services import log_audit_event
 from tenants.models import OnboardingProgress, Tenant, TenantSubscription
 
 
+class SignupConflict(ValueError):
+    pass
+
+
+def outbound_email_is_configured():
+    """Return true only when the selected backend can deliver beyond this process."""
+    return bool(getattr(settings, "OUTBOUND_EMAIL_ENABLED", False))
+
+
 def _username(email):
     base = re.sub(r"[^\w.@+-]", "-", email)[:140] or "owner"
     candidate, suffix = base, 1
@@ -44,6 +53,8 @@ def _token_hash(token):
 def provision_signup(*, business_name, owner_name, email, phone, password, plan=None):
     User = get_user_model()
     email = email.strip().lower()
+    if User._default_manager.filter(email__iexact=email).exists():
+        raise SignupConflict("Unable to create this workspace. Sign in if you already have an account.")
     user = User(username=_username(email), email=email, first_name=owner_name.strip(), is_active=True)
     if hasattr(user, "last_name"):
         parts = owner_name.strip().split(maxsplit=1)
@@ -66,16 +77,30 @@ def provision_signup(*, business_name, owner_name, email, phone, password, plan=
             started_at=now, current_period_ends_at=now + timedelta(days=trial_days),
         )
     progress = OnboardingProgress.objects.create(tenant=tenant)
-    token = secrets.token_urlsafe(48)
-    EmailVerification.objects.create(user=user, token_hash=_token_hash(token), expires_at=now + timedelta(hours=24), last_sent_at=now)
+    log_audit_event(
+        tenant=tenant,
+        actor=user,
+        action=AuditEvent.Action.WORKSPACE_CREATED,
+        target=tenant,
+        after_data={"tenant_id": tenant.pk, "currency": tenant.currency, "timezone": tenant.timezone},
+        metadata={"source": "public_signup"},
+    )
     log_audit_event(tenant=tenant, actor=user, action=AuditEvent.Action.ROLE_ASSIGNED, target=membership,
                     after_data={"user_id": user.pk, "role": membership.role}, metadata={"event": "signup"})
-    verification_url = reverse("verify_email", args=[token])
-    transaction.on_commit(lambda: send_mail(
-        subject="Verify your POS SaaS email address",
-        message=f"Welcome to {tenant.name}. Verify your email here: {verification_url}",
-        from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[email], fail_silently=False,
-    ))
+    if outbound_email_is_configured():
+        token = secrets.token_urlsafe(48)
+        EmailVerification.objects.create(
+            user=user,
+            token_hash=_token_hash(token),
+            expires_at=now + timedelta(hours=24),
+            last_sent_at=now,
+        )
+        verification_url = reverse("verify_email", args=[token])
+        transaction.on_commit(lambda: send_mail(
+            subject="Verify your POS SaaS email address",
+            message=f"Welcome to {tenant.name}. Verify your email here: {verification_url}",
+            from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[email], fail_silently=False,
+        ))
     return user, tenant, membership, progress
 
 
@@ -89,19 +114,64 @@ def verify_email_token(token):
     return verification.user
 
 
-def create_opening_stock(*, tenant, product, quantity, user):
-    from inventory.models import Stock, StockMovement
-    quantity = int(quantity or 0)
-    if quantity <= 0 or not product.track_inventory:
-        return None
-    stock, _ = Stock.objects.get_or_create(tenant=tenant, product=product, defaults={"quantity": 0})
-    before = stock.quantity
-    stock.quantity = before + quantity
-    stock.last_movement_at = timezone.now()
-    stock.save(update_fields=["quantity", "last_movement_at", "updated_at"])
-    StockMovement.objects.create(tenant=tenant, stock=stock, product=product,
-        movement_type=StockMovement.MovementType.ADJUSTMENT_IN,
-        reference_type=StockMovement.ReferenceType.STOCK_ADJUSTMENT, reference_id=product.pk,
-        quantity_delta=quantity, quantity_before=before, quantity_after=stock.quantity,
-        note="Opening stock from onboarding", created_by=user)
-    return stock
+def onboarding_checklist(*, tenant, actor=None):
+    """Evaluate onboarding from real tenant-scoped operational records."""
+    from accounts.models import TenantInvitation
+    from catalog.models import Product
+    from purchasing.models import Purchase
+    from sales.models import Sale
+
+    progress, _ = OnboardingProgress.objects.get_or_create(tenant=tenant)
+    products = Product.objects.filter(tenant=tenant, is_active=True)
+    has_product = products.exists()
+    has_physical_product = products.filter(track_inventory=True).exists()
+    has_service = products.filter(track_inventory=False).exists()
+    has_received_stock = Purchase.objects.filter(tenant=tenant, status=Purchase.Status.RECEIVED).exists()
+    latest_sale = (
+        Sale.objects.filter(tenant=tenant, status=Sale.Status.COMPLETED)
+        .select_related("receipt")
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    has_team_activity = (
+        TenantMembership.objects.filter(
+            tenant=tenant, status=TenantMembership.Status.ACTIVE, is_active=True
+        ).count() > 1
+        or TenantInvitation.objects.filter(tenant=tenant, status=TenantInvitation.Status.PENDING, is_active=True).exists()
+    )
+    steps = [
+        {"key": "profile", "title": "Confirm business profile", "complete": 1 in (progress.completed_steps or []), "optional": False, "url_name": "onboarding_setup", "url_arg": 1},
+        {"key": "product", "title": "Add your first product or service", "complete": has_product, "optional": False, "url_name": "catalog:product-create"},
+        {
+            "key": "stock",
+            "title": "Receive first physical stock",
+            "complete": has_received_stock or (has_product and has_service and not has_physical_product),
+            "not_applicable": has_product and has_service and not has_physical_product,
+            "optional": not has_physical_product,
+            "url_name": "purchasing:purchase-create",
+        },
+        {"key": "sale", "title": "Complete your first sale", "complete": latest_sale is not None, "optional": False, "url_name": "sales:register"},
+        {"key": "team", "title": "Invite a team member", "complete": has_team_activity, "optional": True, "url_name": "team-members"},
+    ]
+    required_complete = all(step["complete"] or step.get("optional") for step in steps)
+    if latest_sale is not None and required_complete and progress.completed_at is None:
+        progress.completed_at = timezone.now()
+        progress.dismissed_at = None
+        progress.save(update_fields=["completed_at", "dismissed_at", "updated_at"])
+        if actor is not None:
+            log_audit_event(
+                tenant=tenant,
+                actor=actor,
+                action=AuditEvent.Action.ONBOARDING_COMPLETED,
+                target=progress,
+                after_data={"completed": True, "first_sale_id": latest_sale.pk},
+            )
+    return {
+        "progress": progress,
+        "steps": steps,
+        "completed_count": sum(1 for step in steps if step["complete"]),
+        "total_count": len(steps),
+        "latest_sale": latest_sale,
+        "is_complete": progress.completed_at is not None,
+        "is_dismissed": progress.is_dismissed,
+    }

@@ -1,0 +1,3 @@
+<span class="status-pill {% if tenant.status == 'active' %}status-success{% elif tenant.status == 'trial' %}status-warning{% elif tenant.status == 'suspended' or tenant.status == 'cancelled' %}status-danger{% else %}status-neutral{% endif %}">
+  {{ tenant.get_status_display }}
+</span>

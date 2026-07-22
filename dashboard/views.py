@@ -14,6 +14,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import TenantMembership
+from accounts.onboarding_services import onboarding_checklist
+from accounts.rbac import OWNER_ROLES
 from catalog.models import Category, Product
 from inventory.models import Stock
 from inventory.models import StockAdjustment
@@ -318,6 +320,12 @@ def dashboard(request):
     owner_roles = (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN)
     manager_roles = owner_roles + (TenantMembership.Role.MANAGER,)
 
+    # Cashiers work at the point of sale. The management dashboard exposes
+    # tenant-wide revenue, purchasing, stock value, and other staff activity,
+    # so it is intentionally not a cashier surface.
+    if current_membership is not None and current_membership.role == TenantMembership.Role.CASHIER:
+        return redirect("sales:register")
+
     context = {
         "current_tenant": (
             {"id": tenant.id, "name": tenant.name, "slug": tenant.slug} if tenant is not None else None
@@ -354,10 +362,12 @@ def dashboard(request):
             in manager_roles
         ),
         "can_view_audit": request.user.is_superuser
-        or (current_membership is not None and current_membership.role == TenantMembership.Role.OWNER_ADMIN),
+        or (current_membership is not None and current_membership.role in OWNER_ROLES),
     }
 
     if tenant is not None:
+        if current_membership is not None and current_membership.role in owner_roles:
+            context["onboarding"] = onboarding_checklist(tenant=tenant, actor=request.user)
         now = timezone.now()
         selected_period = request.GET.get("period", "30d")
         if selected_period not in DATE_RANGE_OPTIONS:
@@ -398,12 +408,12 @@ def dashboard(request):
         )
         low_stock_products = (
             Product.objects.select_related("category", "stock")
-            .filter(tenant=tenant, stock__quantity__lte=F("reorder_level"))
+            .filter(tenant=tenant, track_inventory=True, reorder_level__gt=0, stock__quantity__gt=0, stock__quantity__lte=F("reorder_level"))
             .order_by("name")[:5]
         )
         low_stock_count = Product.objects.filter(
-            tenant=tenant,
-            stock__quantity__lte=F("reorder_level"),
+            tenant=tenant, track_inventory=True, reorder_level__gt=0,
+            stock__quantity__gt=0, stock__quantity__lte=F("reorder_level"),
         ).count()
         sales_by_day = list(
             sales_queryset.annotate(day=TruncDate("created_at"))
@@ -484,7 +494,14 @@ def dashboard(request):
 def select_tenant(request, tenant_id):
     membership = (
         TenantMembership.objects.select_related("tenant")
-        .filter(user=request.user, tenant_id=tenant_id, is_active=True)
+        .filter(
+            user=request.user,
+            tenant_id=tenant_id,
+            status=TenantMembership.Status.ACTIVE,
+            is_active=True,
+            tenant__status__in=(Tenant.Status.TRIAL, Tenant.Status.ACTIVE),
+            tenant__is_active=True,
+        )
         .first()
     )
     if membership is not None:

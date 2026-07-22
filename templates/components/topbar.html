@@ -16,8 +16,9 @@
           {% elif namespace == "purchasing" %}Purchases
           {% elif namespace == "inventory" %}Inventory
           {% elif namespace == "audit" %}Reports
-          {% elif url_name == "team-members" %}Team
-          {% elif url_name == "api-key-management" %}Settings
+          {% elif url_name == "team-members" or url_name == "member-detail" %}Team
+          {% elif url_name == "workspace-settings" %}Settings
+          {% elif url_name == "api-key-management" %}API keys
           {% else %}Dashboard{% endif %}
         </span>
       </div>
@@ -29,8 +30,9 @@
         {% elif namespace == "purchasing" %}Purchases
         {% elif namespace == "inventory" %}Inventory
         {% elif namespace == "audit" %}Reports
-        {% elif url_name == "team-members" %}Team
-        {% elif url_name == "api-key-management" %}Settings
+        {% elif url_name == "team-members" or url_name == "member-detail" %}Team
+        {% elif url_name == "workspace-settings" %}Settings
+        {% elif url_name == "api-key-management" %}API keys
         {% else %}Dashboard{% endif %}
       </h1>
     </div>
@@ -42,16 +44,7 @@
         <span class="status-dot"></span>
         <span>{{ request.tenant.name }}</span>
       </div>
-      {% if available_workspaces|length > 1 %}
-        <details class="account-menu">
-          <summary class="chip">Switch workspace</summary>
-          <div class="account-panel">
-            {% for workspace_membership in available_workspaces %}
-              <form method="post" action="{% url 'switch_workspace' workspace_membership.tenant_id %}">{% csrf_token %}<button class="button-secondary w-full" type="submit">{{ workspace_membership.tenant.name }}</button></form>
-            {% endfor %}
-          </div>
-        </details>
-      {% endif %}
+      {% include "components/workspace_switcher.html" %}
     {% endif %}
     <button class="icon-button" type="button" data-theme-toggle aria-label="Toggle light and dark theme">
       <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/></svg>
@@ -83,6 +76,7 @@
             <span>Workspace</span>
             <strong>{% if request.tenant %}{{ request.tenant.name }}{% else %}Not selected{% endif %}</strong>
           </div>
+          {% if current_membership %}<div class="account-row"><span>Workspace role</span><strong>{{ current_membership.get_role_display }}</strong></div>{% endif %}
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button class="button-danger" type="submit">Sign out</button>

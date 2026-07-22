@@ -1,0 +1,41 @@
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+    dependencies = [("audit", "0003_alter_auditevent_action")]
+
+    operations = [
+        migrations.AlterField(
+            model_name="auditevent",
+            name="action",
+            field=models.CharField(
+                choices=[
+                    ("purchase_created", "Purchase created"),
+                    ("purchase_updated", "Purchase updated"),
+                    ("purchase_duplicated", "Purchase duplicated"),
+                    ("purchase_received", "Purchase received"),
+                    ("purchase_cancelled", "Purchase cancelled"),
+                    ("stock_adjustment_created", "Stock adjustment created"),
+                    ("stock_adjustment_updated", "Stock adjustment updated"),
+                    ("stock_adjustment_posted", "Stock adjustment posted"),
+                    ("stock_adjustment_cancelled", "Stock adjustment cancelled"),
+                    ("role_assigned", "Role assigned"),
+                    ("role_updated", "Role updated"),
+                    ("workspace_created", "Workspace created"),
+                    ("onboarding_dismissed", "Onboarding dismissed"),
+                    ("onboarding_resumed", "Onboarding resumed"),
+                    ("onboarding_completed", "Onboarding completed"),
+                    ("invitation_created", "Invitation created"),
+                    ("invitation_accepted", "Invitation accepted"),
+                    ("invitation_revoked", "Invitation revoked"),
+                    ("invitation_resent", "Invitation resent"),
+                    ("member_suspended", "Member suspended"),
+                    ("member_reactivated", "Member reactivated"),
+                    ("member_removed", "Member removed"),
+                    ("workspace_settings_updated", "Workspace settings updated"),
+                    ("workspace_switched", "Workspace switched"),
+                ],
+                max_length=64,
+            ),
+        ),
+    ]

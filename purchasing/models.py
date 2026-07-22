@@ -29,6 +29,10 @@ class Purchase(TenantScopedModel):
             models.Index(fields=["tenant", "purchase_number"]),
             models.Index(fields=["tenant", "supplier"]),
             models.Index(fields=["tenant", "status"]),
+            models.Index(
+                fields=["tenant", "status", "received_date"],
+                name="purchase_tenant_recv_idx",
+            ),
             models.Index(fields=["tenant", "order_date"]),
         ]
         ordering = ["-order_date", "-id"]

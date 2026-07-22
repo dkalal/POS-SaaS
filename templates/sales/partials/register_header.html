@@ -1,13 +1,38 @@
 <header class="register-workspace-header">
   <div class="flex min-w-0 items-center gap-3">
-    <a class="brand-lockup" href="{% url 'dashboard' %}" aria-label="Return to dashboard">
+    <a class="brand-lockup" href="{% if current_membership and current_membership.role == 'cashier' %}{% url 'sales:register' %}{% else %}{% url 'dashboard' %}{% endif %}" aria-label="{% if current_membership and current_membership.role == 'cashier' %}Open sales register{% else %}Return to dashboard{% endif %}">
       <span class="brand-mark">POS</span>
-      <span class="brand-copy"><strong class="brand-title">Register</strong><span class="brand-subtitle">{{ tenant.name }}</span></span>
+      <span class="brand-copy"><strong class="brand-title">Sales Register</strong><span class="brand-subtitle">{{ tenant.name }}</span></span>
     </a>
-    <span class="status-pill status-success hidden sm:inline-flex">Live sale</span>
+    <span class="status-pill status-success hidden sm:inline-flex"><span class="status-dot" aria-hidden="true"></span>Ready</span>
   </div>
   <div class="flex min-w-0 items-center gap-2">
-    <span class="chip hidden md:inline-flex">{{ request.user.get_username }}{% if current_membership %} · {{ current_membership.get_role_display }}{% endif %}</span>
-    <a class="button-secondary" href="{% url 'dashboard' %}">Dashboard</a>
+    {% if cart_count %}<span class="chip hidden sm:inline-flex" aria-label="Current cart has {{ cart_count }} items">{{ cart_count }} item{{ cart_count|pluralize }}</span>{% endif %}
+    {% if current_membership and current_membership.role == 'cashier' %}
+      <details class="account-menu">
+        <summary class="chip" aria-label="Open my sales activity menu">My activity</summary>
+        <nav class="account-panel" aria-label="My sales activity">
+          <a class="button-secondary w-full justify-between" href="{% url 'sales:sale-list' %}"><span>My sales</span><span aria-hidden="true">›</span></a>
+          <a class="button-secondary w-full justify-between" href="{% url 'sales:invoice-list' %}"><span>My invoices</span><span aria-hidden="true">›</span></a>
+          <a class="button-secondary w-full justify-between" href="{% url 'sales:receipt-list' %}"><span>My receipts</span><span aria-hidden="true">›</span></a>
+        </nav>
+      </details>
+    {% endif %}
+    {% include "components/workspace_switcher.html" %}
+    <button class="icon-button" type="button" data-theme-toggle aria-label="Toggle color theme" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"></path><circle cx="12" cy="12" r="4"></circle></svg></button>
+    {% if not current_membership or current_membership.role != 'cashier' %}<a class="button-secondary" href="{% url 'dashboard' %}">Dashboard</a>{% endif %}
+    <details class="account-menu">
+      <summary aria-label="Open account menu">
+        <span class="avatar">{{ request.user.get_username|slice:":1" }}</span>
+        <span class="account-copy hidden sm:grid"><strong>{{ request.user.get_username }}</strong><span>{% if current_membership %}{{ current_membership.get_role_display }}{% endif %}</span></span>
+        <svg class="hidden sm:block" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="account-panel">
+        <div class="account-row"><span>Signed in</span><strong>{{ request.user.get_username }}</strong></div>
+        <div class="account-row"><span>Workspace</span><strong>{{ tenant.name }}</strong></div>
+        {% if current_membership %}<div class="account-row"><span>Workspace role</span><strong>{{ current_membership.get_role_display }}</strong></div>{% endif %}
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="button-danger w-full justify-center" type="submit">Sign out</button></form>
+      </div>
+    </details>
   </div>
 </header>

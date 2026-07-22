@@ -1,5 +1,11 @@
 from datetime import timedelta
+import hashlib
+import hmac
+import json
 
+from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db import connection
 from django.db import transaction
 from django.utils import timezone
 
@@ -16,15 +22,94 @@ def _tenant_snapshot(tenant):
     }
 
 
+def _platform_digest(*, actor_id, action, target_tenant_id, before_data, after_data,
+                     metadata, previous_hash, hash_version=1, key=None):
+    canonical = json.dumps(
+        {
+            "version": hash_version,
+            "actor_id": actor_id,
+            "action": action,
+            "target_tenant_id": target_tenant_id,
+            "before_data": before_data,
+            "after_data": after_data,
+            "metadata": metadata,
+            "previous_hash": previous_hash,
+        },
+        cls=DjangoJSONEncoder,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    secret = key if key is not None else settings.AUDIT_LOG_HMAC_KEY
+    return hmac.new(secret.encode("utf-8"), canonical, hashlib.sha256).hexdigest()
+
+
+@transaction.atomic
 def _audit(*, actor, action, tenant=None, before_data=None, after_data=None, metadata=None):
+    # A transaction-scoped advisory lock serializes this low-volume global chain.
+    if connection.vendor == "postgresql":
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", [0x504F534155444954])
+    before_data = before_data or {}
+    after_data = after_data or {}
+    metadata = metadata or {}
+    previous_hash = (
+        PlatformAuditLog._base_manager.exclude(integrity_hash="")
+        .order_by("-id")
+        .values_list("integrity_hash", flat=True)
+        .first()
+        or ""
+    )
+    integrity_hash = _platform_digest(
+        actor_id=actor.pk,
+        action=action,
+        target_tenant_id=tenant.pk if tenant else None,
+        before_data=before_data,
+        after_data=after_data,
+        metadata=metadata,
+        previous_hash=previous_hash,
+    )
     return PlatformAuditLog.objects.create(
         actor=actor,
         target_tenant=tenant,
         action=action,
-        before_data=before_data or {},
-        after_data=after_data or {},
-        metadata=metadata or {},
+        before_data=before_data,
+        after_data=after_data,
+        metadata=metadata,
+        previous_hash=previous_hash,
+        integrity_hash=integrity_hash,
     )
+
+
+def verify_platform_audit_chain():
+    previous_hash = ""
+    checked = legacy = 0
+    keys = [settings.AUDIT_LOG_HMAC_KEY, *settings.AUDIT_LOG_HMAC_KEY_FALLBACKS]
+    for event in PlatformAuditLog._base_manager.order_by("id").iterator(chunk_size=1000):
+        if not event.integrity_hash:
+            legacy += 1
+            continue
+        digests = [
+            _platform_digest(
+                actor_id=event.actor_id,
+                action=event.action,
+                target_tenant_id=event.target_tenant_id,
+                before_data=event.before_data,
+                after_data=event.after_data,
+                metadata=event.metadata,
+                previous_hash=event.previous_hash,
+                hash_version=event.hash_version,
+                key=key,
+            )
+            for key in keys
+        ]
+        if event.previous_hash != previous_hash or not any(
+            hmac.compare_digest(event.integrity_hash, digest) for digest in digests
+        ):
+            return {"valid": False, "checked": checked, "legacy": legacy, "failed_event_id": event.pk}
+        previous_hash = event.integrity_hash
+        checked += 1
+    return {"valid": True, "checked": checked, "legacy": legacy, "failed_event_id": None}
 
 
 @transaction.atomic
@@ -50,9 +135,22 @@ def create_tenant(*, actor, plan, billing_cycle, **details):
 
 
 @transaction.atomic
-def change_tenant_status(*, tenant, status, actor):
+def change_tenant_status(*, tenant, status, actor, expected_status=None):
     if status not in {Tenant.Status.ACTIVE, Tenant.Status.SUSPENDED, Tenant.Status.CANCELLED}:
         raise ValueError("Unsupported tenant status transition.")
+    tenant = Tenant.objects.select_for_update().get(pk=tenant.pk)
+    if expected_status and tenant.status != expected_status:
+        raise ValueError("The workspace status changed before confirmation. Review it and try again.")
+    if tenant.status == status:
+        raise ValueError("The workspace already has that status.")
+    allowed_transitions = {
+        Tenant.Status.TRIAL: {Tenant.Status.ACTIVE, Tenant.Status.SUSPENDED, Tenant.Status.CANCELLED},
+        Tenant.Status.ACTIVE: {Tenant.Status.SUSPENDED, Tenant.Status.CANCELLED},
+        Tenant.Status.SUSPENDED: {Tenant.Status.ACTIVE, Tenant.Status.CANCELLED},
+        Tenant.Status.CANCELLED: {Tenant.Status.ACTIVE},
+    }
+    if status not in allowed_transitions.get(tenant.status, set()):
+        raise ValueError("That workspace lifecycle transition is not allowed.")
     before_data = _tenant_snapshot(tenant)
     tenant.status = status
     tenant.is_active = status in {Tenant.Status.ACTIVE, Tenant.Status.TRIAL}

@@ -19,6 +19,22 @@ class TenantScopedQuerySet(models.QuerySet):
         return self.filter(tenant_id=tenant_id)
 
 
+class AppendOnlyTenantQuerySet(TenantScopedQuerySet):
+    """Reject application-level mutation of ledger/audit rows after insertion."""
+
+    def update(self, **kwargs):
+        raise ValueError(f"{self.model.__name__} is append-only and cannot be updated.")
+
+    def delete(self):
+        raise ValueError(f"{self.model.__name__} is append-only and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        raise ValueError(f"{self.model.__name__} must be inserted through its integrity service.")
+
+    def bulk_update(self, objs, fields, **kwargs):
+        raise ValueError(f"{self.model.__name__} is append-only and cannot be updated.")
+
+
 class TenantScopedModel(TimeStampedModel):
     tenant = models.ForeignKey("tenants.Tenant", on_delete=models.PROTECT)
 

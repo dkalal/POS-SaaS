@@ -1,0 +1,1 @@
+<div class="responsive-table-wrap"><table><thead><tr><th>Payment method</th><th>Sales</th><th>Total</th></tr></thead><tbody>{% for row in by_payment %}<tr><td>{{ row.method_label }}</td><td>{{ row.sale_count }}</td><td>{% load pos_format %}{% money row.total %}</td></tr>{% empty %}<tr><td colspan="3">No payment data.</td></tr>{% endfor %}</tbody></table></div>

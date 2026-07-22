@@ -1,0 +1,7 @@
+<details class="relative">
+  <summary class="{% if danger %}button-danger{% else %}button-secondary{% endif %}">{{ trigger_label }}</summary>
+  <div class="absolute right-0 z-30 mt-2 w-72 card-soft p-4 shadow-xl" role="alertdialog" aria-label="{{ title }}">
+    <strong>{{ title }}</strong><p class="app-note mt-2 text-sm">{{ message }}</p>
+    <form class="mt-4 flex justify-end gap-2" method="post" action="{{ action_url }}">{% csrf_token %}{% if status_value %}<input type="hidden" name="status" value="{{ status_value }}">{% endif %}{% if expected_status %}<input type="hidden" name="expected_status" value="{{ expected_status }}">{% endif %}<button class="{% if danger %}button-danger{% else %}button-primary{% endif %}" type="submit">Confirm</button></form>
+  </div>
+</details>

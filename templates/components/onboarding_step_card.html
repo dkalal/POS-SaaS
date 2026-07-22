@@ -1,0 +1,27 @@
+<article class="card-soft flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+  <div class="flex min-w-0 items-start gap-3">
+    <span class="status-pill {% if step.complete %}status-success{% else %}status-neutral{% endif %}" aria-hidden="true">
+      {% if step.complete %}Done{% else %}{{ forloop.counter }}{% endif %}
+    </span>
+    <div>
+      <h3 class="font-extrabold">{{ step.title }}</h3>
+      <p class="mt-1 text-sm app-note">
+        {% if step.not_applicable %}Not required for a service-only catalog.
+        {% elif step.key == 'profile' %}Review the identity and regional defaults already created for this workspace.
+        {% elif step.key == 'product' %}Create a physical item or a non-stock service using the real catalog.
+        {% elif step.key == 'stock' %}Use Purchase / Stock-In so inventory history remains traceable.
+        {% elif step.key == 'sale' %}Use Register to complete a real sale—no demo transaction is created.
+        {% else %}Optional: invite a manager or cashier when you are ready.{% endif %}
+      </p>
+    </div>
+  </div>
+  {% if not step.complete %}
+    {% if step.key == 'profile' %}
+      <form method="post" action="{% url 'onboarding_setup' 1 %}">{% csrf_token %}<button class="button-primary" type="submit">Confirm profile</button></form>
+    {% else %}
+      <a class="button-primary shrink-0" href="{% url step.url_name %}">
+        {% if step.key == 'product' %}Add product or service{% elif step.key == 'stock' %}Record stock-in{% elif step.key == 'sale' %}Open Register{% else %}Invite team member{% endif %}
+      </a>
+    {% endif %}
+  {% endif %}
+</article>

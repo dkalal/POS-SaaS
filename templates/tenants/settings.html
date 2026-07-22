@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Workspace settings | POS SaaS{% endblock %}
+{% block content %}
+<div class="stack">
+  <section class="page-section"><p class="section-eyebrow">Workspace administration</p><h1 class="page-heading">Settings</h1><p class="mt-1 app-note">Changes apply only to {{ tenant.name }} and are recorded in the audit trail.</p></section>
+  {% include "components/settings_section.html" with section="business" title="Business profile" description="Contact and statutory details shown for this workspace." form=settings_forms.business %}
+  {% include "components/settings_section.html" with section="regional" title="Regional settings" description="Currency and timezone defaults for new workspace activity." form=settings_forms.regional %}
+  {% include "components/settings_section.html" with section="receipt" title="Receipt and document settings" description="Update future receipt presentation and numbering prefix without changing historical documents." form=settings_forms.receipt %}
+  {% include "components/settings_section.html" with section="operational" title="Operational settings" description="Defaults for newly created products; existing stock history is never rewritten." form=settings_forms.operational %}
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block title %}Reports | POS SaaS{% endblock %}{% block content %}
+<div class="stack">
+  <section class="page-section"><p class="section-eyebrow">Business insights</p><h1 class="page-heading">Reports</h1><p class="mt-2 app-note">Tenant-scoped operational reports built from completed sales, received purchases, and current stock.</p></section>
+  {% if not has_transactions %}{% include "components/report_empty_state.html" with title="No transactions to report yet" message="Complete a sale or receive a purchase, then return here for real business insights." %}{% endif %}
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <a class="page-section block" href="{% url 'reports:sales' %}"><p class="section-eyebrow">Revenue</p><h2 class="font-extrabold">Sales report</h2><p class="mt-2 app-note text-sm">Completed sales, items, cashiers, payment methods, and top products.</p></a>
+    <a class="page-section block" href="{% url 'reports:purchases' %}"><p class="section-eyebrow">Stock-in</p><h2 class="font-extrabold">Purchases report</h2><p class="mt-2 app-note text-sm">Received purchases, supplier spend, and stock units received.</p></a>
+    <a class="page-section block" href="{% url 'reports:inventory' %}"><p class="section-eyebrow">Current position</p><h2 class="font-extrabold">Inventory report</h2><p class="mt-2 app-note text-sm">Physical products, current quantities, thresholds, and stock status.</p></a>
+    <a class="page-section block" href="{% url 'reports:low-stock' %}"><p class="section-eyebrow">Attention</p><h2 class="font-extrabold">Low-stock report</h2><p class="mt-2 app-note text-sm">Low and out-of-stock products with their last movement.</p></a>
+    <a class="page-section block" href="{% url 'reports:products' %}"><p class="section-eyebrow">Merchandising</p><h2 class="font-extrabold">Product performance</h2><p class="mt-2 app-note text-sm">Quantity sold, revenue, current stock, and supported gross-profit estimates.</p></a>
+    <a class="page-section block" href="{% url 'reports:profit' %}"><p class="section-eyebrow">{% if profit_available %}Historical cost supported{% else %}Availability checked per range{% endif %}</p><h2 class="font-extrabold">Gross profit estimate</h2><p class="mt-2 app-note text-sm">Uses sale-time cost snapshots only; never today’s product cost.</p></a>
+  </div>
+</div>{% endblock %}
+

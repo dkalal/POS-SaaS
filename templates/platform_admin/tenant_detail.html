@@ -10,9 +10,7 @@
         <h2>{{ tenant.name }}</h2>
         <p>{{ tenant.slug }} &middot; {{ tenant.country }} &middot; {{ tenant.currency }}</p>
       </div>
-      <span class="status-pill {% if tenant.status == 'active' %}status-success{% elif tenant.status == 'trial' %}status-warning{% else %}status-danger{% endif %}">
-        {{ tenant.get_status_display }}
-      </span>
+      {% include "components/platform_status_badge.html" with tenant=tenant %}
     </div>
 
     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -35,26 +33,8 @@
       </div>
     </div>
 
-    <div class="mt-4 flex flex-wrap gap-2">
-      {% if tenant.status != 'active' %}
-        <form method="post" action="{% url 'platform_admin:tenant-status' tenant.pk %}">
-          {% csrf_token %}
-          <input name="status" value="active" type="hidden">
-          <button class="button-primary" type="submit" onclick="return confirm('Reactivate this workspace?')">Activate</button>
-        </form>
-      {% endif %}
-      {% if tenant.status != 'suspended' %}
-        <form method="post" action="{% url 'platform_admin:tenant-status' tenant.pk %}">
-          {% csrf_token %}
-          <input name="status" value="suspended" type="hidden">
-          <button class="button-secondary" type="submit" onclick="return confirm('Suspend workspace access without deleting data?')">Suspend</button>
-        </form>
-      {% endif %}
-      <form method="post" action="{% url 'platform_admin:tenant-status' tenant.pk %}">
-        {% csrf_token %}
-        <input name="status" value="cancelled" type="hidden">
-        <button class="button-danger" type="submit" onclick="return confirm('Cancel this tenant? Historical data remains preserved.')">Cancel</button>
-      </form>
+    <div class="mt-4 flex flex-wrap items-start gap-2">
+      {% include "components/tenant_lifecycle_actions.html" with tenant=tenant %}
       <a class="button-secondary" href="{% url 'platform_admin:tenant-list' %}">Back to tenants</a>
     </div>
   </section>

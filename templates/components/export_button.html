@@ -1,0 +1,2 @@
+{% if export_url %}<a class="button-secondary" href="{% url export_url %}{% if filter_query %}?{{ filter_query }}{% endif %}" aria-label="Export filtered {{ report_name }} as CSV">Export CSV</a>{% endif %}
+

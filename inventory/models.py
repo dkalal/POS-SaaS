@@ -68,6 +68,10 @@ class StockMovement(TimeStampedModel):
         indexes = [
             models.Index(fields=["tenant", "stock"]),
             models.Index(fields=["tenant", "product"]),
+            models.Index(
+                fields=["tenant", "product", "created_at"],
+                name="stock_tenant_product_time_idx",
+            ),
             models.Index(fields=["tenant", "movement_type"]),
             models.Index(fields=["tenant", "reference_type", "reference_id"]),
             models.Index(fields=["created_at"]),

@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% load pos_format %}{% block title %}Sales report | POS SaaS{% endblock %}{% block content %}<div class="stack">
+{% include "reports/_header.html" %}{% include "components/report_filter_toolbar.html" %}
+{% if filter_form.is_valid %}
+<div class="stat-grid">{% money summary.total as total %}{% money summary.average as average %}{% include "components/report_metric_card.html" with label="Total sales" value=total hint="Completed and fully paid" %}{% include "components/report_metric_card.html" with label="Completed sales" value=summary.count %}{% include "components/report_metric_card.html" with label="Average sale" value=average %}{% include "components/report_metric_card.html" with label="Items sold" value=summary.items %}</div>
+{% if summary.count %}
+{% include "components/report_table.html" with table_title="Top-selling products" table_description="Ranked by quantity sold." table_template="reports/tables/top_products.html" %}
+<div class="grid gap-4 xl:grid-cols-2">{% include "components/report_table.html" with table_title="Sales by cashier" table_template="reports/tables/sales_by_cashier.html" %}{% include "components/report_table.html" with table_title="Sales by payment method" table_template="reports/tables/sales_by_payment.html" %}</div>
+{% include "components/report_table.html" with table_title="Sales details" table_template="reports/tables/sales_details.html" page_obj=details %}
+{% else %}{% include "components/report_empty_state.html" with title="No completed sales" message="No fully paid, completed sales match these filters." %}{% endif %}{% endif %}</div>{% endblock %}
+

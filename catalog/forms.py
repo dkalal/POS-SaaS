@@ -137,6 +137,9 @@ class ProductForm(TenantBoundModelForm):
         self.fields["barcode"].help_text = "Optional barcode for scanning, separate from SKU."
         self.fields["track_inventory"].help_text = "Turn this off for non-stock items and services."
         self.fields["is_active"].help_text = "Inactive products stay in the catalog but are hidden from daily operations."
+        if tenant is not None and not self.instance.pk:
+            self.fields["track_inventory"].initial = tenant.default_track_inventory
+            self.fields["reorder_level"].initial = tenant.default_reorder_level
 
     def clean_barcode(self):
         barcode = (self.cleaned_data.get("barcode") or "").strip()

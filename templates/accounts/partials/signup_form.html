@@ -1,0 +1,12 @@
+<form method="post" class="mt-8 grid gap-5" novalidate>{% csrf_token %}
+  {% if form.non_field_errors %}<div class="message-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+  {% for field in form %}
+    <div class="form-field">
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+      {% if field.errors %}<div class="form-error" role="alert">{{ field.errors }}</div>{% endif %}
+    </div>
+  {% endfor %}
+  <button class="button-primary justify-self-start" type="submit">Create workspace</button>
+</form>

@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% load pos_format %}
+{% block title %}Sales | POS SaaS{% endblock %}
+{% block content %}
+<div class="stack">
+  <header class="table-toolbar"><div><div class="section-eyebrow">Transactions</div><h1 class="page-heading">Sales</h1><p>Confirmed point-of-sale transactions and their linked documents.</p></div>{% if can_open_register %}<a class="button-primary" href="{% url 'sales:register' %}">Open Register</a>{% endif %}</header>
+  {% url 'sales:sale-list' as reset_url %}{% include "sales/partials/sales_filter_toolbar.html" with kind="sales" search_placeholder="Sale, invoice, receipt, customer, SKU or product" reset_url=reset_url %}
+  <section class="page-section">
+    {% if sales %}<div class="responsive-table-wrap" tabindex="0" aria-label="Sales results"><table class="app-table"><thead><tr><th>Sale / invoice</th><th>Date &amp; time</th><th>Customer</th><th>Cashier</th><th>Units sold</th><th>Total</th><th>Payment</th><th>Receipt</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>
+      {% for sale in sales %}<tr><td><strong>{{ sale.sale_number }}</strong><div class="app-note">{{ sale.invoice.invoice_number }}</div></td><td>{{ sale.created_at|date:"d M Y, H:i" }}</td><td>{{ sale.customer|default:"Walk-in customer" }}</td><td>{{ sale.cashier }}</td><td>{{ sale.item_quantity }}</td><td>{% money sale.grand_total tenant.currency %}</td><td>{% include "components/payment_status_badge.html" with status=sale.payment.status label=sale.payment.get_status_display %}<div class="app-note">{{ sale.payment.get_method_display }}</div></td><td>{% if sale.receipt %}<span class="status-pill status-success">Issued</span>{% else %}<span class="status-pill status-neutral">Not issued</span>{% endif %}</td><td><a class="button-secondary" href="{% url 'sales:sale-detail' sale.id %}">View</a></td></tr>{% endfor %}
+    </tbody></table></div>{% include "components/pagination.html" with page_obj=sales %}
+    {% else %}{% include "components/empty_state.html" with title="No sales found" message="No confirmed sales match the current search and filters." action_url=reset_url action_label="Reset filters" %}{% endif %}
+  </section>
+</div>
+{% endblock %}

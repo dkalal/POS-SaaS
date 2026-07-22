@@ -1,0 +1,19 @@
+<section class="page-section" aria-labelledby="onboarding-title">
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <span class="chip">First-use guide</span>
+      <h2 id="onboarding-title" class="mt-3 text-xl font-extrabold">Set up {{ tenant.name }}</h2>
+      <p class="mt-1 text-sm app-note">{{ onboarding.completed_count }} of {{ onboarding.total_count }} milestones complete. Progress is calculated from real workspace records.</p>
+    </div>
+    {% if onboarding.is_dismissed %}
+      <form method="post" action="{% url 'resume_onboarding' %}">{% csrf_token %}<button class="button-secondary" type="submit">Resume guide</button></form>
+    {% elif compact %}
+      <a class="button-primary" href="{% url 'onboarding_setup' 1 %}">Continue setup</a>
+    {% else %}
+      <form method="post" action="{% url 'dismiss_onboarding' %}">{% csrf_token %}<button class="button-secondary" type="submit">Dismiss for now</button></form>
+    {% endif %}
+  </div>
+  <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-valuemin="0" aria-valuemax="{{ onboarding.total_count }}" aria-valuenow="{{ onboarding.completed_count }}">
+    <div class="h-full rounded-full bg-sky-500" style="width: {% widthratio onboarding.completed_count onboarding.total_count 100 %}%"></div>
+  </div>
+</section>

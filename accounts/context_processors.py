@@ -1,4 +1,5 @@
 from accounts.models import TenantMembership
+from accounts.rbac import OWNER_ROLES
 
 
 def session_identity(request):
@@ -19,7 +20,7 @@ def session_identity(request):
             .first()
         )
 
-    owner_roles = (TenantMembership.Role.OWNER_ADMIN, TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN)
+    owner_roles = OWNER_ROLES
     is_owner_admin = bool(
         getattr(user, "is_authenticated", False)
         and membership is not None and membership.role in owner_roles
@@ -42,12 +43,15 @@ def session_identity(request):
     return {
         "current_membership": membership,
         "can_open_register": can_open_register,
+        "can_view_sales_documents": can_open_register,
+        "can_manage_quotations": is_manager_or_above,
         "can_manage_members": is_owner_admin,
+        "can_manage_workspace_settings": is_owner_admin,
         "can_manage_api_keys": is_owner_admin,
         "can_manage_catalog": is_manager_or_above,
         "can_manage_purchases": is_manager_or_above,
         "can_manage_inventory": is_manager_or_above,
-        "can_view_reports": is_owner_admin,
+        "can_view_reports": is_manager_or_above,
         "available_workspaces": (
             TenantMembership.objects.select_related("tenant")
             .filter(user=user, status=TenantMembership.Status.ACTIVE, is_active=True,

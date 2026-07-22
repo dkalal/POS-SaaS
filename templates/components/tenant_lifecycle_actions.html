@@ -1,0 +1,12 @@
+<div class="flex flex-wrap gap-2">
+  {% url 'platform_admin:tenant-status' tenant.pk as status_url %}
+  {% if tenant.status == 'trial' or tenant.status == 'suspended' or tenant.status == 'cancelled' %}
+    {% include "components/confirmation_dialog.html" with trigger_label="Activate" title="Activate workspace?" message="Workspace members will regain access immediately. No tenant data is changed." action_url=status_url status_value="active" expected_status=tenant.status %}
+  {% endif %}
+  {% if tenant.status == 'trial' or tenant.status == 'active' %}
+    {% include "components/confirmation_dialog.html" with trigger_label="Suspend" title="Suspend workspace access?" message="All workspace access will be blocked while data and history remain intact." action_url=status_url status_value="suspended" expected_status=tenant.status %}
+  {% endif %}
+  {% if tenant.status != 'cancelled' %}
+    {% include "components/confirmation_dialog.html" with trigger_label="Cancel" title="Cancel this workspace?" message="Access will be blocked. Tenant data and audit history remain preserved." action_url=status_url status_value="cancelled" expected_status=tenant.status danger=True %}
+  {% endif %}
+</div>

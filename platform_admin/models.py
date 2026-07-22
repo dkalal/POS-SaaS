@@ -4,6 +4,20 @@ from django.db import models
 from core.models import TimeStampedModel
 
 
+class AppendOnlyPlatformAuditQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValueError("PlatformAuditLog is append-only and cannot be updated.")
+
+    def delete(self):
+        raise ValueError("PlatformAuditLog is append-only and cannot be deleted.")
+
+    def bulk_create(self, objs, **kwargs):
+        raise ValueError("PlatformAuditLog must be inserted through its integrity service.")
+
+    def bulk_update(self, objs, fields, **kwargs):
+        raise ValueError("PlatformAuditLog is append-only and cannot be updated.")
+
+
 class PlatformAuditLog(TimeStampedModel):
     class Action(models.TextChoices):
         TENANT_CREATED = "tenant_created", "Tenant created"
@@ -24,10 +38,29 @@ class PlatformAuditLog(TimeStampedModel):
     before_data = models.JSONField(default=dict, blank=True)
     after_data = models.JSONField(default=dict, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+    previous_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
+    integrity_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
+    hash_version = models.PositiveSmallIntegerField(default=1, editable=False)
+
+    objects = AppendOnlyPlatformAuditQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at", "-id"]
-        indexes = [models.Index(fields=["target_tenant", "action"]), models.Index(fields=["created_at"])]
+        indexes = [
+            models.Index(fields=["target_tenant", "action"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["integrity_hash"], name="platform_audit_hash_idx"),
+        ]
 
     def __str__(self):
         return f"{self.get_action_display()} by {self.actor}"
+
+    def save(self, *args, **kwargs):
+        if self.pk is not None:
+            raise ValueError("PlatformAuditLog is append-only and cannot be updated.")
+        if not self.integrity_hash:
+            raise ValueError("PlatformAuditLog must be created through the platform audit service.")
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValueError("PlatformAuditLog is append-only and cannot be deleted.")

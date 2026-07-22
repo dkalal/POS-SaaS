@@ -3,7 +3,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.loader import render_to_string
@@ -54,6 +54,7 @@ def dashboard(request):
             "trials_expiring": tenants.filter(status=Tenant.Status.TRIAL, trial_ends_at__lte=trials_cutoff, trial_ends_at__gte=now).count(),
             "suspended_tenants": tenants.filter(status=Tenant.Status.SUSPENDED).count(),
             "active_users": TenantMembership.objects.filter(is_active=True, tenant__is_active=True).count(),
+            "onboarding_complete": tenants.filter(onboarding__completed_at__isnull=False).count(),
         },
         recent_tenants=tenants.select_related("subscription_plan").order_by("-created_at")[:6],
         recent_audit=PlatformAuditLog.objects.select_related("actor", "target_tenant")[:8],
@@ -64,7 +65,23 @@ def dashboard(request):
 @login_required
 @platform_admin_required
 def tenant_list(request):
-    tenants = Tenant.objects.select_related("subscription_plan").annotate(active_users=Count("tenantmembership", distinct=True))
+    owner_memberships = TenantMembership.objects.filter(
+        role__in=(TenantMembership.Role.OWNER, TenantMembership.Role.OWNER_ADMIN),
+        status=TenantMembership.Status.ACTIVE,
+        is_active=True,
+    ).select_related("user")
+    tenants = (
+        Tenant.objects.select_related("subscription_plan", "onboarding")
+        .prefetch_related(Prefetch("tenantmembership_set", queryset=owner_memberships, to_attr="active_owners"))
+        .annotate(
+            active_users=Count(
+                "tenantmembership",
+                filter=Q(tenantmembership__status=TenantMembership.Status.ACTIVE, tenantmembership__is_active=True),
+                distinct=True,
+            )
+        )
+        .order_by("-created_at", "name")
+    )
     return _html_response(request, "platform_admin/tenant_list.html", _base_context(tenants=tenants))
 
 
@@ -110,7 +127,12 @@ def tenant_status(request, tenant_id):
     tenant = get_object_or_404(Tenant, pk=tenant_id)
     status = request.POST.get("status")
     try:
-        change_tenant_status(tenant=tenant, status=status, actor=request.user)
+        change_tenant_status(
+            tenant=tenant,
+            status=status,
+            actor=request.user,
+            expected_status=request.POST.get("expected_status"),
+        )
     except ValueError as exc:
         messages.error(request, str(exc))
     else:

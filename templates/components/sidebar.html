@@ -1,7 +1,7 @@
 {% with namespace=request.resolver_match.namespace url_name=request.resolver_match.url_name %}
 <aside class="admin-sidebar" data-sidebar>
   <div class="sidebar-head">
-    <a class="brand-lockup" href="{% url 'dashboard' %}" aria-label="Open dashboard">
+    <a class="brand-lockup" href="{% if current_membership and current_membership.role == 'cashier' %}{% url 'sales:register' %}{% else %}{% url 'dashboard' %}{% endif %}" aria-label="{% if current_membership and current_membership.role == 'cashier' %}Open register{% else %}Open dashboard{% endif %}">
       <span class="brand-mark">PS</span>
       <span class="brand-copy">
         <span class="brand-title">POS SaaS</span>
@@ -15,21 +15,27 @@
   <nav class="sidebar-nav" aria-label="Back office navigation">
     <div class="nav-group">
       <div class="nav-label">Workspace</div>
-      <a class="nav-item {% if url_name == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
-        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V3h-8v18ZM3 21h8v-6H3v6Z"/></svg>
-        <span>Dashboard</span>
-      </a>
+      {% if not current_membership or current_membership.role != 'cashier' %}
+        <a class="nav-item {% if url_name == 'dashboard' %}is-active{% endif %}" href="{% url 'dashboard' %}">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 13h8V3H3v10Zm10 8h8V3h-8v18ZM3 21h8v-6H3v6Z"/></svg>
+          <span>Dashboard</span>
+        </a>
+      {% endif %}
       {% if can_open_register %}
         <a class="nav-item {% if namespace == 'sales' and url_name == 'register' %}is-active{% endif %}" href="{% url 'sales:register' %}">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h16v9H4V5Zm2 11h12v3H6v-3Zm10-8h2m-12 0h6"/></svg>
           <span>Register</span>
         </a>
       {% endif %}
-      <span class="nav-item is-disabled" aria-disabled="true">
-        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm3 4h8M8 12h8M8 16h5"/></svg>
-        <span>Sales / Receipts</span>
-        <small>Soon</small>
-      </span>
+      {% if can_view_sales_documents %}
+        <a class="nav-item {% if namespace == 'sales' and url_name == 'sale-list' or namespace == 'sales' and url_name == 'sale-detail' %}is-active{% endif %}" href="{% url 'sales:sale-list' %}">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm3 4h8M8 12h8M8 16h5"/></svg>
+          <span>{% if current_membership and current_membership.role == 'cashier' %}My sales{% else %}Sales{% endif %}</span>
+        </a>
+        {% if can_manage_quotations %}<a class="nav-item {% if namespace == 'sales' and 'quotation' in url_name %}is-active{% endif %}" href="{% url 'sales:quotation-list' %}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 4h14v16H5V4Zm3 4h8M8 12h8M8 16h5"/></svg><span>Quotations</span></a>{% endif %}
+        <a class="nav-item {% if namespace == 'sales' and 'invoice' in url_name %}is-active{% endif %}" href="{% url 'sales:invoice-list' %}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18H6V3Zm3 5h6M9 12h6M9 16h4"/></svg><span>{% if current_membership and current_membership.role == 'cashier' %}My invoices{% else %}Invoices{% endif %}</span></a>
+        <a class="nav-item {% if namespace == 'sales' and 'receipt' in url_name %}is-active{% endif %}" href="{% url 'sales:receipt-list' %}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1V3Zm2 5h6m-6 4h6"/></svg><span>{% if current_membership and current_membership.role == 'cashier' %}My receipts{% else %}Receipts{% endif %}</span></a>
+      {% endif %}
     </div>
 
     {% if can_manage_catalog or can_manage_inventory or can_manage_purchases %}
@@ -46,7 +52,7 @@
           </a>
         {% endif %}
         {% if can_manage_inventory %}
-          <a class="nav-item {% if namespace == 'inventory' %}is-active{% endif %}" href="{% url 'inventory:adjustment-list' %}">
+          <a class="nav-item {% if namespace == 'inventory' %}is-active{% endif %}" href="{% url 'inventory:overview' %}">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 17V7l8-4 8 4v10l-8 4-8-4Zm8-4V3m0 10 8-4m-8 4-8-4"/></svg>
             <span>Inventory / Stock</span>
           </a>
@@ -71,11 +77,11 @@
       </div>
     {% endif %}
 
-    {% if can_view_reports or can_manage_members or can_manage_api_keys %}
+    {% if can_view_reports or can_manage_members or can_manage_api_keys or can_manage_workspace_settings %}
       <div class="nav-group">
         <div class="nav-label">Admin</div>
         {% if can_view_reports %}
-          <a class="nav-item {% if namespace == 'audit' %}is-active{% endif %}" href="{% url 'audit:audit-list' %}">
+          <a class="nav-item {% if namespace == 'reports' %}is-active{% endif %}" href="{% url 'reports:landing' %}">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19V5h14v14H5Zm3-4 3-3 2 2 3-5"/></svg>
             <span>Reports</span>
           </a>
@@ -89,9 +95,10 @@
         {% if can_manage_api_keys %}
           <a class="nav-item {% if url_name == 'api-key-management' %}is-active{% endif %}" href="{% url 'api-key-management' %}">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14 10a5 5 0 1 0-3 4.58L13 17h3v3h4v-4l-4.42-4.42A5 5 0 0 0 14 10Zm-7 0h.01"/></svg>
-            <span>Settings</span>
+            <span>API keys</span>
           </a>
         {% endif %}
+        {% if can_manage_workspace_settings %}<a class="nav-item {% if url_name == 'workspace-settings' %}is-active{% endif %}" href="{% url 'workspace-settings' %}"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4 2-2-2-3-3 1-2-2-1-3h-4l-1 3-2 2-3-1-2 3 2 2-2 2 2 3 3-1 2 2 1 3h4l1-3 2-2 3 1 2-3-2-2Z"/></svg><span>Settings</span></a>{% endif %}
       </div>
     {% endif %}
   </nav>

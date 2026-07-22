@@ -1,0 +1,22 @@
+<form method="get" class="page-section" aria-label="Report filters">
+  {% if filter_form.errors %}<div class="message-error mb-3" role="alert">{{ filter_form.errors }}</div>{% endif %}
+  <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <label class="form-field"><span>Period</span>{{ filter_form.period }}</label>
+    <label class="form-field"><span>From</span>{{ filter_form.date_from }}</label>
+    <label class="form-field"><span>To</span>{{ filter_form.date_to }}</label>
+    {% if filter_form.supplier %}<label class="form-field"><span>Supplier</span>{{ filter_form.supplier }}</label>{% endif %}
+    {% if filter_form.category %}<label class="form-field"><span>Category</span>{{ filter_form.category }}</label>{% endif %}
+    {% if filter_form.product %}<label class="form-field"><span>Product</span>{{ filter_form.product }}</label>{% endif %}
+    {% if filter_form.cashier %}<label class="form-field"><span>Cashier</span>{{ filter_form.cashier }}</label>{% endif %}
+    {% if filter_form.customer %}<label class="form-field"><span>Customer</span>{{ filter_form.customer }}</label>{% endif %}
+    {% if filter_form.payment_method %}<label class="form-field"><span>Payment method</span>{{ filter_form.payment_method }}</label>{% endif %}
+    {% if filter_form.stock_status %}<label class="form-field"><span>Stock status</span>{{ filter_form.stock_status }}</label>{% endif %}
+  </div>
+  <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+    <p class="app-note text-sm">Range: {{ range_label }}</p>
+    <div class="flex flex-wrap gap-2">
+      <a class="button-secondary" href="{{ request.path }}">Reset</a>
+      <button class="button-primary" type="submit">Apply filters</button>
+    </div>
+  </div>
+</form>

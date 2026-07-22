@@ -6,9 +6,15 @@ services:
       POSTGRES_USER: pos_saas
       POSTGRES_PASSWORD: pos_saas
     ports:
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pos_saas -d pos_saas"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   web:
     build: .
@@ -16,14 +22,17 @@ services:
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      # Bind only to the selected interface. The checked-in default is local;
+      # .env may opt into a trusted LAN address without exposing every adapter.
+      - "${POS_SAAS_BIND_ADDRESS:-127.0.0.1}:${POS_SAAS_WEB_PORT:-8002}:8000"
     environment:
       DJANGO_SECRET_KEY: dev-secret-key
       DJANGO_DEBUG: "1"
-      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0,${POS_SAAS_ALLOWED_HOSTS:-}
       DATABASE_URL: postgres://pos_saas:pos_saas@db:5432/pos_saas
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:

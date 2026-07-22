@@ -1,0 +1,10 @@
+{% if available_workspaces|length > 1 %}
+<details class="account-menu">
+  <summary class="chip" aria-label="Switch workspace">Switch workspace</summary>
+  <div class="account-panel" role="menu">
+    {% for workspace_membership in available_workspaces %}
+      <form method="post" action="{% url 'switch_workspace' workspace_membership.tenant_id %}">{% csrf_token %}<button class="button-secondary w-full justify-between" type="submit" {% if request.tenant.id == workspace_membership.tenant_id %}disabled aria-current="true"{% endif %}><span>{{ workspace_membership.tenant.name }}</span><small>{{ workspace_membership.get_role_display }}</small></button></form>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}

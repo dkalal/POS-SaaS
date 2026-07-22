@@ -1,1 +1,11 @@
-{% extends "base.html" %}{% block title %}Workspace setup | POS SaaS{% endblock %}{% block content %}<div class="mx-auto w-full max-w-3xl py-6"><div class="mb-6 flex items-center justify-between"><div><span class="chip">Workspace setup</span><h1 class="page-title mt-3 text-3xl font-bold">{{ tenant.name }}</h1></div><span class="text-sm app-note">Step {{ step }} of 5</span></div><div class="mb-6 grid grid-cols-5 gap-2">{% for n in "12345" %}<div class="h-2 rounded-full {% if forloop.counter <= step %}bg-sky-400{% else %}bg-slate-700{% endif %}"></div>{% endfor %}</div><section class="page-section surface-strong"><h2 class="text-2xl font-semibold">{% if step == 1 %}Tell us about your business{% elif step == 2 %}Set your POS preferences{% elif step == 3 %}Add your first product{% else %}Invite your team{% endif %}</h2><p class="mt-2 app-note">{% if step == 1 %}These details appear on receipts and workspace settings.{% elif step == 2 %}Keep the defaults simple; you can refine them later.{% elif step == 3 %}Add one item now, or skip this step and build your catalog later.{% else %}Managers run operations. Cashiers focus on the register.{% endif %}</p><form method="post" class="mt-7 grid gap-5" novalidate>{% csrf_token %}{% for field in form %}<div class="form-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="text-sm text-rose-200">{{ field.errors }}</div>{% endif %}</div>{% endfor %}<div class="flex flex-wrap gap-3"><button class="button-primary" type="submit">{% if step == 4 %}Save and finish{% else %}Continue{% endif %}</button>{% if step == 3 or step == 4 %}<button class="button-secondary" name="skip" value="1" type="submit">I’ll do this later</button>{% endif %}</div></form></section></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Workspace setup | POS SaaS{% endblock %}
+{% block content %}
+<div class="mx-auto w-full max-w-4xl py-6 stack">
+  {% include "components/onboarding_progress.html" with onboarding=onboarding %}
+  <section class="grid gap-3" aria-label="Workspace setup milestones">
+    {% for step in steps %}{% include "components/onboarding_step_card.html" with step=step %}{% endfor %}
+  </section>
+  <p class="text-center text-sm app-note">Nothing here blocks access to your workspace. You can leave and resume at any time.</p>
+</div>
+{% endblock %}

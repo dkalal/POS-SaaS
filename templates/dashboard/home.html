@@ -28,6 +28,9 @@
       </div>
     </section>
   {% else %}
+    {% if onboarding and not onboarding.is_complete %}
+      {% include "components/onboarding_progress.html" with onboarding=onboarding compact=True %}
+    {% endif %}
     <section class="page-section">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
@@ -76,7 +79,7 @@
 
     {% url 'sales:register' as register_url %}
     {% url 'catalog:product-list' as product_url %}
-    {% url 'inventory:adjustment-list' as inventory_url %}
+    {% url 'inventory:overview' as inventory_url %}
     {% url 'purchasing:purchase-list' as purchase_url %}
     <section class="stat-grid">
       {% include "components/stat_card.html" with icon="sales" label="Total sales" value=stats.sales_total hint=selected_period_label href=register_url %}
@@ -237,9 +240,7 @@
             {% if can_manage_purchases %}
               <a class="button-secondary justify-start" href="{% url 'purchasing:purchase-create' %}">Record purchase</a>
             {% endif %}
-            {% if can_manage_inventory %}
-              <a class="button-secondary justify-start" href="{% url 'inventory:adjustment-create' %}">New stock adjustment</a>
-            {% endif %}
+            {% if can_manage_inventory %}<a class="button-secondary justify-start" href="{% url 'inventory:overview' %}">Open inventory</a>{% endif %}
             {% if can_manage_members %}
               <a class="button-secondary justify-start" href="{% url 'team-members' %}">Manage team</a>
             {% endif %}

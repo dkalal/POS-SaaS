@@ -1,0 +1,9 @@
+{% if status == "paid" or status == "completed" or status == "converted" or status == "accepted" %}
+  <span class="status-pill status-success">{{ label }}</span>
+{% elif status == "draft" or status == "sent" or status == "issued" %}
+  <span class="status-pill status-warning">{{ label }}</span>
+{% elif status == "rejected" or status == "expired" or status == "cancelled" or status == "failed" %}
+  <span class="status-pill status-danger">{{ label }}</span>
+{% else %}
+  <span class="status-pill status-neutral">{{ label }}</span>
+{% endif %}

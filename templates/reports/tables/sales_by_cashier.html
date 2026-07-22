@@ -1,0 +1,2 @@
+<div class="responsive-table-wrap"><table><thead><tr><th>Cashier</th><th>Sales</th><th>Total</th></tr></thead><tbody>{% for row in by_cashier %}<tr><td>{% firstof row.cashier__first_name row.cashier__username %} {{ row.cashier__last_name }}</td><td>{{ row.sale_count }}</td><td>{% load pos_format %}{% money row.total %}</td></tr>{% empty %}<tr><td colspan="3">No cashier data.</td></tr>{% endfor %}</tbody></table></div>
+

@@ -5,6 +5,7 @@ from django.urls import reverse
 from accounts.models import TenantMembership
 from catalog.models import Category, Product
 from platform_admin.models import PlatformAuditLog
+from platform_admin.services import verify_platform_audit_chain
 from tenants.models import SubscriptionPlan, Tenant
 
 
@@ -78,7 +79,32 @@ class PlatformAdminTests(TestCase):
         self.assertFalse(self.tenant.is_active)
         event = PlatformAuditLog.objects.get(target_tenant=self.tenant, action=PlatformAuditLog.Action.TENANT_SUSPENDED)
         self.assertEqual(event.actor, self.operator)
+        self.assertTrue(event.integrity_hash)
+        self.assertTrue(verify_platform_audit_chain()["valid"])
+        with self.assertRaisesMessage(ValueError, "append-only"):
+            event.delete()
         self.assertEqual(event.before_data["status"], Tenant.Status.ACTIVE)
+
+    def test_stale_lifecycle_confirmation_is_rejected(self):
+        self.client.force_login(self.operator)
+        response = self.client.post(
+            reverse("platform_admin:tenant-status", args=[self.tenant.pk]),
+            {"status": Tenant.Status.SUSPENDED, "expected_status": Tenant.Status.TRIAL},
+        )
+
+        self.assertRedirects(response, reverse("platform_admin:tenant-detail", args=[self.tenant.pk]))
+        self.tenant.refresh_from_db()
+        self.assertEqual(self.tenant.status, Tenant.Status.ACTIVE)
+        self.assertFalse(
+            PlatformAuditLog.objects.filter(
+                target_tenant=self.tenant, action=PlatformAuditLog.Action.TENANT_SUSPENDED
+            ).exists()
+        )
+
+    def test_platform_operator_cannot_open_tenant_business_routes(self):
+        self.client.force_login(self.operator)
+        response = self.client.get(reverse("catalog:product-list"))
+        self.assertEqual(response.status_code, 403)
 
     def test_tenant_scoped_page_never_returns_another_tenants_product(self):
         other = Tenant.objects.create(name="Beta", slug="beta", subscription_plan=self.plan)

@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from accounts.models import TenantMembership
 from audit.models import AuditEvent
+from audit.services import log_audit_event, verify_audit_chain
 from catalog.models import Category, Product
 from inventory.models import StockAdjustment
 from inventory.services import create_draft_adjustment, post_adjustment
@@ -88,3 +89,38 @@ class AuditServiceTests(TestCase):
         event = AuditEvent.objects.get(tenant=self.tenant, action=AuditEvent.Action.STOCK_ADJUSTMENT_POSTED)
         self.assertEqual(event.before_data["status"], StockAdjustment.Status.DRAFT)
         self.assertEqual(event.after_data["status"], StockAdjustment.Status.POSTED)
+
+    def test_events_form_a_verifiable_append_only_chain(self):
+        first = log_audit_event(
+            tenant=self.tenant,
+            actor=self.owner,
+            action=AuditEvent.Action.ROLE_ASSIGNED,
+            target=self.product,
+            after_data={"role": "manager"},
+        )
+        second = log_audit_event(
+            tenant=self.tenant,
+            actor=self.owner,
+            action=AuditEvent.Action.ROLE_UPDATED,
+            target=self.product,
+            before_data={"role": "manager"},
+            after_data={"role": "cashier"},
+        )
+
+        self.assertEqual(second.previous_hash, first.integrity_hash)
+        self.assertTrue(verify_audit_chain(tenant=self.tenant)["valid"])
+        with self.assertRaisesMessage(ValueError, "append-only"):
+            first.delete()
+        with self.assertRaisesMessage(ValueError, "append-only"):
+            AuditEvent.objects.filter(pk=first.pk).update(target_label="tampered")
+
+    def test_direct_unsealed_event_creation_is_rejected(self):
+        with self.assertRaisesMessage(ValueError, "log_audit_event"):
+            AuditEvent.objects.create(
+                tenant=self.tenant,
+                actor=self.owner,
+                action=AuditEvent.Action.ROLE_ASSIGNED,
+                target_content_type_id=1,
+                target_object_id=str(self.product.pk),
+                target_label=str(self.product),
+            )
